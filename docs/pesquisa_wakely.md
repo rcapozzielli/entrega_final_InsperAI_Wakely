@@ -11,7 +11,7 @@ O que a pesquisa encontrou:
 - **Biologia:** olho fechado por segundos é fácil de medir, mas já é um sinal tardio. A sonolência inicial é mais útil e bem mais difícil, então deve ser tratada como objetivo exploratório.
 - **Indústria:** montadoras somam sinais do volante e câmeras IR, e não publicam seus algoritmos. O Wakely pode reaproveitar os limiares do programa europeu de avaliação de carros novos, o [Euro NCAP](https://cdn.euroncap.com/cars/assets/Euro_NCAP_Protocol_Safe_Driving_Driver_Engagement_v1_2_ebce03a443.pdf): 1 a 2 s para microssono, 3 s para sono e 6 s para motorista sem resposta.
 - **YOLO e SAM 2:** nenhum dos dois classifica sonolência sozinho. O YOLO26n é uma boa alternativa para a etapa por frame, e o SAM 2 não serve para tempo real em CPU. Vale conversar com a organização, já que a recomendação dela foi outra.
-- **Dados:** MRL Eye para o olho e parte do UTA-RLDD ou DROZY para a sequência. Separar por pessoa é obrigatório.
+- **Dados:** MRL Eye para o olho, UTA-RLDD recortado ou DROZY para a sequência, e FL3D para testar o microssono. Separar por pessoa é obrigatório.
 - **Expectativa:** resultados de 98% a 99% merecem desconfiança. Com pessoas novas no teste, os estudos analisados ficaram entre 50% e 94%, com tarefas e métricas diferentes. No RLDD, a referência foi de [65,2%](https://ar5iv.labs.arxiv.org/html/1904.07312).
 - **Limites:** nunca testar dirigindo e apresentar como protótipo acadêmico. O alerta avisa, mas não mantém ninguém acordado.
 
@@ -353,7 +353,7 @@ Não recomendamos 3D-CNN nem Transformer de vídeo em duas semanas. Modelos como
 
 ## Datasets
 
-**Recomendação: treinar a CNN de olho no MRL Eye, separado por pessoa, e o modelo temporal em parte do UTA-RLDD ou no DROZY.** O prazo favorece câmera RGB, porque os conjuntos com acesso imediato são majoritariamente RGB. O NTHU-DDD é um bônus: enviem o formulário já, mas não dependam dele para 12/11.
+**Recomendação: treinar a CNN de olho no MRL Eye, separado por pessoa, e o modelo temporal na versão recortada do UTA-RLDD, disponível no Kaggle, ou no DROZY.** O prazo favorece câmera RGB, porque os conjuntos com acesso imediato são majoritariamente RGB. O NTHU-DDD é um bônus: enviem o formulário já, mas não dependam dele para 12/11.
 
 Nenhum dataset foi baixado nesta pesquisa, então os links finais de download ainda precisam de teste. Também não lemos as licenças em PDF do NTHU e do DROZY.
 
@@ -370,13 +370,33 @@ Nenhum dataset foi baixado nesta pesquisa, então os links finais de download ai
 
 Conferimos as páginas do MRL, RLDD, DMD e DROZY nesta revisão. Os dados do NTHU, YawDD, NITYMED e CEW vieram da leitura de um agente, e o site do NTHU recusou a conexão quando tentamos reabri-lo. Os termos da licença do DROZY também vieram do agente, então confiram antes de citar. O [SUST-DDD](https://zenodo.org/records/6519933) ficou de fora porque não confirmamos o acesso aos vídeos.
 
+### O que achamos no Kaggle
+
+**O Kaggle traz duas versões processadas que economizam muito trabalho: o UTA-RLDD recortado e o FL3D, com rótulo por frame.** Avaliamos descrição, licença e estrutura de arquivos, e lemos a anotação de um vídeo do FL3D, sem baixar as imagens e os vídeos. As licenças abaixo são as declaradas por quem publicou, que nem sempre é o autor da base.
+
+| Base | O que é | Tamanho | Licença declarada | Uso sugerido | Cuidado |
+| --- | --- | --- | --- | --- | --- |
+| [UTA-RLDD recortado](https://www.kaggle.com/datasets/mathiasviborg/uta-rldd-videos-cropped-by-faces) | Vídeos do RLDD recortados no rosto, 224x224, 10 fps, em clipes de 5 a 60 s | 6,7 GB | CC BY-NC-SA 4.0 | Treinar o modelo temporal, pois a pasta traz o ID da pessoa | Publicado por terceiro; só as classes 0 e 10, sem a intermediária; falta a classe sonolenta da pessoa 42 |
+| [FL3D](https://www.kaggle.com/datasets/matjazmuc/frame-level-driver-drowsiness-detection-fl3d) | 53.331 frames do NITYMED, com rótulo alerta, microssono ou bocejo em cada frame | 628 MB | CC BY-SA 4.0 | Testar a regra de olho fechado e o classificador em RGB noturno | Piscadas foram removidas; a validação e o teste repetem motoristas do treino; a licença do NITYMED no Kaggle proíbe derivados |
+| [NITYMED](https://www.kaggle.com/datasets/nikospetrellis/nitymed) | Vídeos de 21 motoristas em carros reais à noite, com bocejos e microssonos | 695 MB | CC BY-ND 4.0 (a página do DataPort informava CC BY 4.0) | Base do FL3D e teste final | Parece seguir roteiro; a descrição e os arquivos listados não batem no total de vídeos |
+| [MRL Eye (cópia)](https://www.kaggle.com/datasets/akashshingha850/mrl-eye-dataset) | Cópia do MRL, com "fechado" renomeado para "Sleepy" | 345 MB | MIT | Preferir o ZIP oficial | Os nomes guardam o ID, mas refaçam a divisão por pessoa |
+
+Como um vídeo do FL3D fica na prática: o P1042751 tem 3.059 frames anotados, 2.790 alerta e 269 microssono, com 5 pontos faciais por frame. Isso é um exemplo, não a proporção da base inteira.
+
+O que evitar por enquanto:
+
+- **[DDD](https://www.kaggle.com/datasets/ismailnasri20/driver-drowsiness-dataset-ddd):** 41.790 frames extraídos do RLDD, com licença desconhecida. O nome dos arquivos não mostra a pessoa, então é difícil separar por pessoa. Uma [outra página](https://www.kaggle.com/datasets/dhuwxy/nthu-drowsy-driver-dataset) tem exatamente o mesmo tamanho em bytes com o nome de NTHU, o que sugere uma cópia com rótulo errado.
+- **Cópias do NTHU-DDD:** [existem](https://www.kaggle.com/datasets/ikhlaselhamly/nthu-ddd), com ID e condição no nome do arquivo, mas com licença desconhecida. O acesso oficial exige formulário, então perguntem ao orientador antes de usar uma cópia.
+- **[UnityEyes](https://www.kaggle.com/datasets/hazemfahmy/openned-closed-eyes):** olhos sintéticos de simulador, com limiar de abertura arbitrário. Não tem pessoas reais.
+- **Bases pequenas ou sem origem clara:** como [face-behavier](https://www.kaggle.com/datasets/nexuswho/drowsiness-detection) e [ADMS](https://www.kaggle.com/datasets/smartcity12/adms-dataset). Não avaliamos pessoas nem origem delas.
+
 ### Como usar no prazo
 
 Esta divisão é uma sugestão nossa:
 
 1. **Estado do olho:** MRL Eye, separado por ID, mais CEW para reduzir a diferença entre IR e RGB.
-2. **Sequência real:** um subconjunto do UTA-RLDD, porque 111,3 GB não cabe bem no Colab. O DROZY é a alternativa menor.
-3. **Teste por evento:** DMD Drowsiness, com intervalos marcados, lembrando que é encenado. Confiram o tamanho do subconjunto hoje.
+2. **Sequência real:** o UTA-RLDD recortado do Kaggle, com 6,7 GB em vez de 111,3 GB. O DROZY continua como alternativa com KSS.
+3. **Teste por evento:** FL3D, com rótulo por frame em carros reais à noite, e DMD Drowsiness, com intervalos marcados, lembrando que é encenado. Confiram o tamanho do DMD hoje.
 4. **Noite e bocejo:** NITYMED e YawDD, sabendo que o YawDD exige anotação própria.
 
 Plano B, nesta ordem:
@@ -388,7 +408,7 @@ Plano B, nesta ordem:
 ### Armadilhas
 
 - **Olho fechado não é sonolência:** há [cópias do MRL](https://gts.ai/dataset-download/mrl-infrared-eye-images-dataset/) que renomeiam "fechado" e "aberto" para "Sleepy" e "Awake". Um modelo treinado assim detecta olho fechado, não sonolência.
-- **Kaggle e Roboflow:** não conseguimos ler essas páginas diretamente. Em buscas, [projetos](https://universe.roboflow.com/augmented-startups/drowsiness-detection-cntmz) de contas diferentes [repetem a mesma descrição](https://universe.roboflow.com/tfod-3vqyg/drowzness-detection/dataset/) com licenças divergentes. Tratem como cópias até confirmar a origem.
+- **Roboflow:** não conseguimos ler essas páginas diretamente. Em buscas, [projetos](https://universe.roboflow.com/augmented-startups/drowsiness-detection-cntmz) de contas diferentes [repetem a mesma descrição](https://universe.roboflow.com/tfod-3vqyg/drowzness-detection/dataset/) com licenças divergentes. Tratem como cópias até confirmar a origem.
 - **Licença ausente:** MRL e RLDD não declaram licença. Isso não significa uso livre, então citem a fonte e perguntem aos autores se forem além do projeto.
 - **Fonte da imagem:** no CEW, os olhos abertos vêm do LFW e os fechados da internet. O modelo pode aprender a origem em vez do olho.
 - **Fundo do vídeo:** no RLDD, cada estado é um vídeo separado, e os participantes [tiveram 20 dias para gravar](https://ar5iv.labs.arxiv.org/html/1904.07312). Luz e roupa podem se correlacionar com a classe, então usem só o recorte do rosto.
@@ -577,5 +597,5 @@ Não foram reabertas na revisão final. Confiram antes de citar:
 
 - O EUR-Lex (usamos cópias dos regulamentos).
 - O corpo do [guia da ANPD](https://ouvidoria.unifesspa.edu.br/images/Documentos/Guia-tratamento-de-dados-para-fins-academicos.pdf) e o texto oficial da Resolução CNS 510/2016.
-- Páginas do Kaggle e do Roboflow, e as licenças em PDF do DROZY e do NTHU.
+- Páginas do Roboflow, e as licenças em PDF do DROZY e do NTHU.
 - O manual atual da Tesla e o da BMW, que ficaram fora da tabela de montadoras.
