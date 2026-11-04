@@ -1,0 +1,2 @@
+# Evita que o Git altere PDFs em clones no Windows
+*.pdf binary
