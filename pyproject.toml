@@ -17,6 +17,7 @@ dependencies = [
     "kagglehub>=0.3",
     "ipykernel>=6.29",
     "nbconvert>=7.16",
+    "ultralytics>=8.4.202",
 ]
 
 [tool.uv]
