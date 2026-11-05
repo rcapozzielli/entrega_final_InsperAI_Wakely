@@ -14,6 +14,7 @@ A pesquisa está concluída, e a primeira versão do notebook ([`wakely.ipynb`](
 | CNN de olho (MobileNetV3-Small, MRL Eye separado por pessoa) | Feita | 97,0% de acurácia em 8 pessoas novas |
 | CNN no vídeo, no lugar do EAR | Feita | Microssono por frame: F1 0,75; com T = 1 s, alerta em 13 de 26 episódios e 6 falsos alarmes |
 | Comparação com a YOLO26n classificadora (5 sementes) | Feita | Acurácia de 97,7% contra 96,8% da MobileNetV3; 84,5% contra 73,5% dos episódios de 1 s ou mais nos 44 vídeos |
+| Filtro de bocejo e teste de piscadas | Feita | YOLO com filtro: 86,8% dos episódios de 1 s ou mais e 10 falsos alarmes nos 44 vídeos, contra 84,5% e 33 sem filtro |
 | Modelo temporal (GRU ou TCN) | A fazer | |
 | Demo com webcam | A fazer | |
 
@@ -23,7 +24,9 @@ Usando os 44 vídeos, com o limiar de cada vídeo escolhido nos outros, o EAR co
 
 Com 5 sementes, a YOLO26n-cls supera a MobileNetV3 nos 44 vídeos (11 pontos a mais, intervalo de +3,7 a +19,4), mas nenhuma das duas supera o EAR de forma conclusiva. A biblioteca `ultralytics` é AGPL-3.0: manter o YOLO no projeto exige planejar a publicação do código, e essa decisão ainda é do grupo.
 
-O teste em vídeo é pequeno (2 vídeos com microssono), 2 dos seus 5 motoristas também aparecem no treino dos autores do FL3D e não há piscadas, então os falsos alarmes ainda não estão bem medidos. As escolhas abaixo continuam sendo a proposta atual, a validar com o grupo e nos testes.
+Quase todos os falsos alarmes estavam ligados a bocejos, então o sistema passou a ignorar o olho fechado durante um bocejo detectado pela abertura da boca. Isso reduz o total em cerca de 23 alarmes nos três sinais. A base não mostra microssono junto de bocejo, que é o maior risco dessa escolha. Recolocando os frames que o FL3D removeu, T = 1 s parece segurar as piscadas (cerca de 1% dos buracos curtos atravessados por um alarme), mas sobram alarmes em trechos sem rótulo, então a taxa real de falso alarme ainda não está medida.
+
+O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motoristas também aparecem no treino dos autores do FL3D. As escolhas abaixo continuam sendo a proposta atual, a validar com o grupo e nos testes.
 
 ## Proposta de pipeline
 
@@ -54,7 +57,7 @@ uv sync
 uv run jupyter nbconvert --to notebook --execute --inplace wakely.ipynb
 ```
 
-Também dá para abrir o `wakely.ipynb` no VS Code com o kernel do `.venv`. A seção 1 do notebook baixa o MRL Eye (342 MB), o FL3D (645 MB, do Kaggle, sem login) e o modelo do MediaPipe para `data/`. A primeira execução leva cerca de 30 minutos, quase tudo no MediaPipe. Depois disso, landmarks e pesos ficam em cache em `data/`.
+Também dá para abrir o `wakely.ipynb` no VS Code com o kernel do `.venv`. A seção 1 do notebook baixa o MRL Eye (342 MB), o FL3D (645 MB, do Kaggle, sem login) e o modelo do MediaPipe para `data/`, e a seção 6 baixa o NITYMED (697 MB, do Kaggle). A primeira execução leva cerca de 30 minutos, quase tudo no MediaPipe. Depois disso, landmarks e pesos ficam em cache em `data/`.
 
 ## Prazos
 
