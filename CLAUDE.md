@@ -36,9 +36,12 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 | 4 | CNN no vídeo e ajustes do sinal (4.2), com validação cruzada |
 | 5 | Comparação entre MobileNetV3 e YOLO26n-cls, com 5 sementes |
 | 6 | Falsos alarmes: filtro de bocejo (6.1) e piscadas via NITYMED (6.2) |
-| 7 | Resumo e próximos passos |
+| 7 | Agente de RL no alerta: Q-learning com tabela, curva por λ, tecla "foi alarme falso" e mapa da política |
+| 8 | Resumo e próximos passos |
 
-Funções principais: `fechamento`, `bocejo_ativo`, `alertas` e `avaliar_eventos` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2).
+Funções principais: `fechamento`, `bocejo_ativo`, `alertas` e `avaliar_eventos` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2), `rodar_agente`, `rodar_regra` e `treinar_agente` (seção 7).
+
+A seção 7 foi rodada numa RTX 4060 com os caches e pesos da `data/` do Rafael. As seções 1 a 6 mantêm as saídas originais, e a execução local reproduz esses números até a quarta casa decimal.
 
 ## Dados
 
@@ -71,6 +74,8 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 - **Classificadores:** o YOLO supera a MobileNet em recall, com filtro (+10,8 pontos, intervalo de +3,5 a +19,8). Ele não supera o EAR de forma conclusiva (+1,3 pontos, intervalo de -7,5 a +13,7).
 - **No MRL, em 8 pessoas novas:** acurácia de 97,7% no YOLO e 96,8% na MobileNet.
 - **Filtro:** com o mesmo limiar de olho, não perdeu microssonos na calibração. Parte do ganho de recall vem de um limiar mais baixo, que também aumenta os alarmes fora de bocejo.
+- **Agente de RL (seção 7, linha do tempo completa, 11 dobras por vídeo, 5 sementes):** não supera a regra em nenhum λ. Com YOLO e λ = 10, acha 143 de 165 episódios de 1 s ou mais com 15,4 falsos alarmes (4,2 fortes), contra 149 e 10 da regra com piso. Aprende sozinho a ignorar o bocejo e avisa com 0,8 s quando já houve 3 ou mais fechamentos longos no último minuto. A tecla simulada tira de 6% a 22% dos falsos alarmes no mesmo λ.
+- **Piso de 3 s ignorando o filtro de bocejo:** custa 2 alarmes com o YOLO e 22 com o EAR, nos 44 vídeos.
 - **Piscadas (YOLO, semente 42, com filtro, 46 min):** 8 alarmes atravessam os 710 buracos de até 0,5 s, cerca de 1%. No total são 27 alarmes, dos quais 17 estão em buracos longos sem rótulo. **A taxa real de falso alarme ainda não está medida.**
 
 ## Cuidados

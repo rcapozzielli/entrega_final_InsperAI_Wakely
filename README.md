@@ -15,6 +15,7 @@ A pesquisa está concluída, e a primeira versão do notebook ([`wakely.ipynb`](
 | CNN no vídeo, no lugar do EAR | Feita | Microssono por frame: F1 0,75; com T = 1 s, alerta em 13 de 26 episódios e 6 falsos alarmes |
 | Comparação com a YOLO26n classificadora (5 sementes) | Feita | Acurácia de 97,7% contra 96,8% da MobileNetV3; 84,5% contra 73,5% dos episódios de 1 s ou mais nos 44 vídeos |
 | Filtro de bocejo e teste de piscadas | Feita | YOLO com filtro: 86,8% dos episódios de 1 s ou mais e 10 falsos alarmes nos 44 vídeos, contra 84,5% e 33 sem filtro |
+| Agente de RL no alerta (Q-learning, piso de 3 s) | Feito | Não supera a regra: com YOLO e λ = 10, 87% dos episódios de 1 s ou mais e 15 falsos alarmes (4 fortes), contra 90% e 10 da regra com piso |
 | Modelo temporal (GRU ou TCN) | A fazer | |
 | Demo com webcam | A fazer | |
 
@@ -25,6 +26,8 @@ Usando os 44 vídeos, com o limiar de cada vídeo escolhido nos outros, o EAR co
 Com 5 sementes, a YOLO26n-cls supera a MobileNetV3 nos 44 vídeos (11 pontos a mais, intervalo de +3,7 a +19,4), mas nenhuma das duas supera o EAR de forma conclusiva. A biblioteca `ultralytics` é AGPL-3.0: manter o YOLO no projeto exige planejar a publicação do código, e essa decisão ainda é do grupo.
 
 Quase todos os falsos alarmes estavam ligados a bocejos, então o sistema passou a ignorar o olho fechado durante um bocejo detectado pela abertura da boca. Isso reduz o total em cerca de 23 alarmes nos três sinais. A base não mostra microssono junto de bocejo, que é o maior risco dessa escolha. Recolocando os frames que o FL3D removeu, T = 1 s parece segurar as piscadas (cerca de 1% dos buracos curtos atravessados por um alarme), mas sobram alarmes em trechos sem rótulo, então a taxa real de falso alarme ainda não está medida.
+
+A seção 7 testa um agente de reinforcement learning que decide, durante o olho fechado, entre esperar, aviso leve e aviso forte, com uma tecla de "foi alarme falso" simulada. Ele aprende sozinho a ignorar o bocejo e a avisar mais cedo quando a pessoa já teve vários fechamentos longos, mas não supera a regra com estes dados. Ela também testa um piso de 3 s que dispara mesmo durante bocejo: com o YOLO, ele custa 2 alarmes nos 44 vídeos.
 
 O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motoristas também aparecem no treino dos autores do FL3D. As escolhas abaixo continuam sendo a proposta atual, a validar com o grupo e nos testes.
 
@@ -42,7 +45,7 @@ O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motorist
 
 | Arquivo | O que é |
 | --- | --- |
-| [`wakely.ipynb`](wakely.ipynb) | Notebook: dados, linha de base EAR, CNN de olho e avaliação em vídeo |
+| [`wakely.ipynb`](wakely.ipynb) | Notebook: dados, linha de base EAR, CNN de olho, avaliação em vídeo e agente de RL no alerta |
 | [`pyproject.toml`](pyproject.toml) e `uv.lock` | Ambiente (Python 3.12, PyTorch com CUDA, MediaPipe, Ultralytics) |
 | [`docs/pesquisa_wakely.md`](docs/pesquisa_wakely.md) | Pesquisa sobre biologia, indústria, arquitetura, datasets, avaliação e ética |
 | [`docs/pipeline_recomendado.png`](docs/pipeline_recomendado.png) | Diagrama do pipeline |
