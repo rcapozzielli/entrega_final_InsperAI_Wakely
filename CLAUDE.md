@@ -2,7 +2,7 @@
 
 Protótipo acadêmico da Insper AI que detecta sonolência ao volante com câmera e deep learning. **Não é um dispositivo de segurança e nunca deve ser testado dirigindo.**
 
-Este arquivo resume o estado do projeto em 05/11/2026. A pesquisa completa está em `docs/pesquisa_wakely.md`, e o código e os resultados, em `wakely.ipynb`.
+Este arquivo resume o estado do projeto em 05/11/2026, depois do PR #10 (agente de RL). A pesquisa completa está em `docs/pesquisa_wakely.md`, e o código e os resultados, em `wakely.ipynb`.
 
 Prazos: apresentação intermediária em 12/11/2026, entrega final (notebook e paper) em 17/11/2026 e apresentação final em 18/11/2026.
 
@@ -24,6 +24,8 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 
 - **Regra de alerta:** olho fechado por T = 1 s, o limite inferior da faixa de microssono do Euro NCAP. Há também os níveis de 3 s (sono) e 6 s (sem resposta), ainda pouco testados.
 - **Filtro de bocejo:** ignora o olho fechado durante um bocejo detectado pela abertura da boca. Usa só frames passados, para valer também ao vivo.
+- **Piso de 3 s (proposto):** olho fechado por 3 s ou mais dispara o aviso forte mesmo durante bocejo, para não silenciar quem dorme de boca aberta. Foi testado na seção 7 (custa 2 alarmes com o YOLO nos 44 vídeos), mas ainda não entrou na regra das seções 2 a 6.
+- **Agente de RL (seção 7):** é um experimento. Ele não supera a regra e não faz parte do pipeline.
 - **Ainda não existe:** o modelo temporal (GRU ou TCN) para sonolência em janelas longas, e a demo com webcam.
 
 ## Estrutura do notebook
@@ -60,6 +62,7 @@ A seção 7 foi rodada numa RTX 4060 com os caches e pesos da `data/` do Rafael.
 - **Figuras com recortes de olhos ficam no notebook,** para mostrar os dados, com as fontes citadas.
 - **Não treinar CNN do zero.** Os classificadores usam fine-tuning a partir do ImageNet. Do zero, só o modelo temporal.
 - **YOLO detector e SAM 2 estão fora do pipeline.** A pergunta sobre isso à organização ainda está em aberto.
+- **Agente de RL fica como experimento.** A demo usa a regra (YOLO, T = 1 s, filtro de bocejo), e a sugestão é somar o piso de 3 s.
 
 ## Resultados
 
@@ -87,6 +90,8 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 - **Ponto cego do filtro:** a base não mostra microssono junto de bocejo, porque cada frame tem um único rótulo. Falar ou rir também pode ativar o filtro.
 - **Rótulo e roteiro:** 35% dos episódios do FL3D duram menos de 1 s, e os vídeos parecem seguir um roteiro.
 - **Falsos alarmes:** a taxa de bocejo não representa uma viagem. Reporte alarmes em bocejo e fora de bocejo separadamente, cada um com o próprio denominador.
+- **Gravações do grupo servem só para teste.** Treinar, escolher limiar ou escolher T com elas faz o sistema decorar quem gravou. Se mais de uma pessoa gravar, avalie deixando uma pessoa de fora por vez. A calibração do primeiro minuto e a tecla de alarme falso são personalização na hora do uso e não contam como overfitting, desde que a avaliação seja feita em outra pessoa.
+- **Vídeos da internet (YouTube etc.):** não usar. Os termos de uso proíbem baixar, e são rostos sem consentimento (LGPD). Para medir falsos alarmes em pessoas acordadas, use bases públicas, como a classe alerta do UTA-RLDD, o YawDD ou o DMD.
 - **Reprodutibilidade:** o teste de alinhamento com o NITYMED (264 amostras) e a inspeção visual dos recortes foram feitos fora do notebook. Ele só registra as conclusões.
 
 ## Convenções
@@ -94,14 +99,24 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 - Não versionar dados, vídeos, recortes soltos, caches nem pesos. O `.gitignore` já cobre isso.
 - Não versionar segredos. O repositório é público.
 - Trabalhar em branch com PR. Conflitos em `.ipynb` são difíceis de resolver, então avise o grupo antes de editar o notebook.
-- Depois de mudar código no notebook, executar tudo e conferir se os números do texto, do resumo (seção 7) e do `README.md` batem com as saídas.
+- Depois de mudar código no notebook, executar tudo e conferir se os números do texto, do resumo (seção 8) e do `README.md` batem com as saídas.
 - Gravações do grupo só em local seguro, na mesa ou em carro desligado e parado, e depois de consultar o orientador sobre LGPD e ética.
 
 ## Próximos passos
 
-1. **Modelo temporal:** linha de base com PERCLOS e GRU ou TCN sobre a série de P(fechado), treinada no UTA-RLDD recortado, com validação por pessoa. A GRU ou TCN precisa superar a linha de base.
-2. **Demo com webcam:** FPS reais, estado "sem rosto visível" e os três níveis de alerta.
-3. **Falsos alarmes reais:** gravações encenadas com piscadas, conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.
+1. **Demo com webcam (para 12/11):** regra com YOLO, filtro de bocejo e piso de 3 s, FPS reais, estado "sem rosto visível" e os três níveis de alerta.
+2. **Falsos alarmes reais:** medir em pessoas acordadas (classe alerta do UTA-RLDD) e em gravações encenadas do grupo, só como teste, com piscadas, conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.
+3. **Modelo temporal:** linha de base com PERCLOS e GRU ou TCN sobre a série de P(fechado), treinada no UTA-RLDD recortado, com validação por pessoa. A GRU ou TCN precisa superar a linha de base.
+4. **Piso de 3 s na regra principal:** levar o piso da seção 7 para as seções 6 e 8, e conferir os números.
+
+## Pontos fracos atuais
+
+- **Só o sinal tardio:** sem o modelo temporal, o sistema detecta o olho já fechado, e não a sonolência antes do microssono.
+- **Teste pequeno:** o holdout tem 2 vídeos com microssono, e a validação cruzada é por vídeo, não por motorista.
+- **Taxa real de falso alarme não medida:** o FL3D removeu as piscadas, e a maioria dos alarmes na linha do tempo completa cai em trechos sem rótulo.
+- **Redes × EAR:** nenhum classificador supera o EAR de forma conclusiva. O treino é em infravermelho (MRL) e o teste em RGB.
+- **Recorte do olho:** fica torto quando a cabeça cai, justamente no microssono.
+- **Agente de RL:** tem poucos dados por pessoa (vídeos de 20 s a 2 min) para aprender a personalizar.
 
 ## Pendências menores
 
