@@ -10,13 +10,15 @@ A pesquisa está concluída, e a primeira versão do notebook ([`wakely.ipynb`](
 
 | Etapa | Estado | Resultado no teste |
 | --- | --- | --- |
-| Linha de base: MediaPipe + EAR + regras do Euro NCAP | Feita | Microssono por frame: F1 0,66 no FL3D |
-| CNN de olho (MobileNetV3-Small, MRL Eye separado por pessoa) | Feita | 96,6% de acurácia em 8 pessoas novas |
-| CNN no vídeo, no lugar do EAR | Feita | Microssono por frame: F1 0,75; alerta em 22 de 26 episódios |
+| Linha de base: MediaPipe + EAR + regras do Euro NCAP | Feita | Microssono por frame: F1 0,66; com T = 1 s, alerta em 7 de 26 episódios e 3 falsos alarmes |
+| CNN de olho (MobileNetV3-Small, MRL Eye separado por pessoa) | Feita | 97,0% de acurácia em 8 pessoas novas |
+| CNN no vídeo, no lugar do EAR | Feita | Microssono por frame: F1 0,75; com T = 1 s, alerta em 13 de 26 episódios e 6 falsos alarmes |
 | Modelo temporal (GRU ou TCN) | A fazer | |
 | Demo com webcam | A fazer | |
 
-O teste em vídeo é pequeno (2 vídeos com microssono) e não tem piscadas, então os falsos alarmes ainda não estão bem medidos. As escolhas abaixo continuam sendo a proposta atual, a validar com o grupo e nos testes.
+T é o tempo de olho fechado até o alerta. Usamos T = 1 s, o limite inferior da faixa de microssono do Euro NCAP. Dos 26 episódios do teste, só 14 duram 1 s ou mais: neles, o EAR acha 7 e a CNN, 13. Na calibração, os dois quase empatam (114 e 111 de 228 episódios), e o resultado da CNN varia entre treinos, então ela ainda não superou o EAR de forma clara.
+
+O teste em vídeo é pequeno (2 vídeos com microssono), 2 dos seus 5 motoristas também aparecem no treino dos autores do FL3D e não há piscadas, então os falsos alarmes ainda não estão bem medidos. As escolhas abaixo continuam sendo a proposta atual, a validar com o grupo e nos testes.
 
 ## Proposta de pipeline
 
