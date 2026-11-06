@@ -6,7 +6,7 @@ Protótipo acadêmico de detecção de sonolência ao volante com câmera e deep
 
 ## Status
 
-A pesquisa está concluída, e a primeira versão do notebook ([`wakely.ipynb`](wakely.ipynb)) já roda a linha de base e a CNN de olho. O modelo temporal (GRU ou TCN) e a demo com webcam ainda faltam.
+A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já roda a linha de base, a CNN de olho, o filtro de bocejo, o agente de RL e o modelo temporal (GRU e TCN). A demo com webcam ainda falta.
 
 | Etapa | Estado | Resultado no teste |
 | --- | --- | --- |
@@ -16,18 +16,21 @@ A pesquisa está concluída, e a primeira versão do notebook ([`wakely.ipynb`](
 | Comparação com a YOLO26n classificadora (5 sementes) | Feita | Acurácia de 97,7% contra 96,8% da MobileNetV3; 84,5% contra 73,5% dos episódios de 1 s ou mais nos 44 vídeos |
 | Filtro de bocejo e teste de piscadas | Feita | YOLO com filtro: 86,8% dos episódios de 1 s ou mais e 10 falsos alarmes nos 44 vídeos, contra 84,5% e 33 sem filtro |
 | Agente de RL no alerta (Q-learning, piso de 3 s) | Feito | Não supera a regra: com YOLO e λ = 10, 87% dos episódios de 1 s ou mais e 15 falsos alarmes (4 fortes), contra 90% e 10 da regra com piso |
-| Modelo temporal (GRU ou TCN) | A fazer | |
+| Falsos alarmes em pessoas acordadas (UTA-RLDD) | Feito | 6,7 alarmes por hora em 9,5 h; 90% das pessoas sem nenhum, e uma pessoa com 40 dos 64 |
+| Modelo temporal (GRU e TCN, UTA-RLDD) | Feito | Não supera o PERCLOS: AUC 0,750 (GRU) e 0,754 (TCN), contra 0,774 do PERCLOS do minuto |
 | Demo com webcam | A fazer | |
 
 T é o tempo de olho fechado até o alerta. Usamos T = 1 s, o limite inferior da faixa de microssono do Euro NCAP. Dos 26 episódios do teste, só 14 duram 1 s ou mais: neles, o EAR acha 7 e a CNN, 13. Na calibração, os dois quase empatam (114 e 111 de 228 episódios), e o resultado da CNN varia entre treinos.
 
 Usando os 44 vídeos, com o limiar de cada vídeo escolhido nos outros, o EAR com filtro de mediana acha 79% dos episódios de 1 s ou mais (130 de 165) com 30 falsos alarmes, e a CNN, 66% (109 de 165) com 56. Os intervalos de confiança se sobrepõem, então a CNN ainda não superou o EAR.
 
-Com 5 sementes, a YOLO26n-cls supera a MobileNetV3 nos 44 vídeos (11 pontos a mais, intervalo de +3,7 a +19,4), mas nenhuma das duas supera o EAR de forma conclusiva. A biblioteca `ultralytics` é AGPL-3.0: manter o YOLO no projeto exige planejar a publicação do código, e essa decisão ainda é do grupo.
+Com 5 sementes, a YOLO26n-cls supera a MobileNetV3 nos 44 vídeos (11 pontos a mais, intervalo de +3,7 a +19,4), mas nenhuma das duas supera o EAR de forma conclusiva. A biblioteca `ultralytics` é AGPL-3.0, e por isso o repositório é público, com a mesma licença.
 
 Quase todos os falsos alarmes estavam ligados a bocejos, então o sistema passou a ignorar o olho fechado durante um bocejo detectado pela abertura da boca. Isso reduz o total em cerca de 23 alarmes nos três sinais. A base não mostra microssono junto de bocejo, que é o maior risco dessa escolha. Recolocando os frames que o FL3D removeu, T = 1 s parece segurar as piscadas (cerca de 1% dos buracos curtos atravessados por um alarme), mas sobram alarmes em trechos sem rótulo, então a taxa real de falso alarme ainda não está medida.
 
 A seção 7 testa um agente de reinforcement learning que decide, durante o olho fechado, entre esperar, aviso leve e aviso forte, com uma tecla de "foi alarme falso" simulada. Ele aprende sozinho a ignorar o bocejo e a avisar mais cedo quando a pessoa já teve vários fechamentos longos, mas não supera a regra com estes dados. Ela também testa um piso de 3 s que dispara mesmo durante bocejo: com o YOLO, ele custa 2 alarmes nos 44 vídeos.
+
+A seção 8 usa o UTA-RLDD recortado: 1.126 clipes de 1 minuto, de 60 pessoas, alertas ou sonolentas, com rótulo autorrelatado. Em 9,5 horas de pessoas acordadas, a regra da demo dá 6,7 falsos alarmes por hora, mas 90% das pessoas não têm nenhum, e uma pessoa sozinha dá 40 dos 64. Os alarmes se concentram em quem tem o olho aberto menor na imagem. Para estimar a sonolência no minuto, com 5 dobras por pessoa, o PERCLOS sozinho chega a AUC de 0,77. A regressão logística sobre 6 atributos, a GRU e a TCN treinadas do zero ficam entre 0,75 e 0,76, sem diferença conclusiva: com estes sinais, o padrão de 1 minuto já está resumido no PERCLOS.
 
 O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motoristas também aparecem no treino dos autores do FL3D. As escolhas abaixo continuam sendo a proposta atual, a validar com o grupo e nos testes.
 
@@ -38,14 +41,14 @@ O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motorist
 1. Uma webcam capta o rosto do motorista.
 2. O MediaPipe localiza os olhos.
 3. Um classificador com fine-tuning estima se o olho está fechado em cada frame. Vamos comparar MobileNetV3 e YOLO26n classificadora.
-4. Uma GRU ou TCN analisa a sequência e estima o nível de sonolência.
+4. Uma medida do último minuto estima o nível de sonolência. Na seção 8, o PERCLOS empatou com a GRU e a TCN e é o candidato mais simples.
 5. Uma regra simples dispara o alerta quando o olho fica fechado por tempo prolongado.
 
 ## Conteúdo
 
 | Arquivo | O que é |
 | --- | --- |
-| [`wakely.ipynb`](wakely.ipynb) | Notebook: dados, linha de base EAR, CNN de olho, avaliação em vídeo e agente de RL no alerta |
+| [`wakely.ipynb`](wakely.ipynb) | Notebook: dados, linha de base EAR, CNN de olho, avaliação em vídeo, agente de RL no alerta e modelo temporal |
 | [`pyproject.toml`](pyproject.toml) e `uv.lock` | Ambiente (Python 3.12, PyTorch com CUDA, MediaPipe, Ultralytics) |
 | [`docs/pesquisa_wakely.md`](docs/pesquisa_wakely.md) | Pesquisa sobre biologia, indústria, arquitetura, datasets, avaliação e ética |
 | [`docs/pipeline_recomendado.png`](docs/pipeline_recomendado.png) | Diagrama do pipeline |
@@ -60,7 +63,7 @@ uv sync
 uv run jupyter nbconvert --to notebook --execute --inplace wakely.ipynb
 ```
 
-Também dá para abrir o `wakely.ipynb` no VS Code com o kernel do `.venv`. A seção 1 do notebook baixa o MRL Eye (342 MB), o FL3D (645 MB, do Kaggle, sem login) e o modelo do MediaPipe para `data/`, e a seção 6 baixa o NITYMED (697 MB, do Kaggle). A primeira execução leva cerca de 30 minutos, quase tudo no MediaPipe. Depois disso, landmarks e pesos ficam em cache em `data/`.
+Também dá para abrir o `wakely.ipynb` no VS Code com o kernel do `.venv`. A seção 1 do notebook baixa o MRL Eye (342 MB), o FL3D (645 MB, do Kaggle, sem login) e o modelo do MediaPipe para `data/`, a seção 6 baixa o NITYMED (697 MB, do Kaggle) e a seção 8, a pasta `len60` do UTA-RLDD recortado (1,2 GB, do Kaggle). A primeira execução leva cerca de 30 minutos, quase tudo no MediaPipe, mais cerca de 2,5 horas na CPU para extrair os sinais do UTA-RLDD. Depois disso, landmarks e pesos ficam em cache em `data/`.
 
 ## Prazos
 
