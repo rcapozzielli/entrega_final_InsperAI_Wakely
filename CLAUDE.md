@@ -13,7 +13,7 @@ uv sync
 uv run jupyter nbconvert --to notebook --execute --inplace wakely.ipynb --ExecutePreprocessor.timeout=-1
 ```
 
-- Com o cache pronto, a execução leva cerca de 4 minutos em uma RTX 3050.
+- Com o cache pronto e a pasta `len60` baixada, a execução leva cerca de 8 minutos em uma RTX 3050.
 - Sem cache, leva cerca de 1 hora, com download de cerca de 1,7 GB, extração com o MediaPipe e 11 treinos.
 - `data/` fica fora do Git. Ela guarda os dados, `data/cache/` (sinais e recortes) e `data/modelos/` (pesos).
 - Para refazer a extração do FL3D, é preciso apagar os arquivos `fl3d_*` de `data/cache/`.
@@ -46,7 +46,7 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 
 Funções principais: `fechamento`, `bocejo_ativo`, `alertas` e `avaliar_eventos` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2), `rodar_agente`, `rodar_regra` e `treinar_agente` (seção 7), `extrair_pessoa`, `atributos`, `avisos_regra`, `metricas_8` e `prever_temporal` (seção 8).
 
-A seção 7 foi rodada numa RTX 4060 com os caches e pesos da `data/` do Rafael, e as seções 1 a 6 mantêm as saídas originais. As saídas da seção 8 vêm de uma execução completa na CPU de um Apple M5, sem erros e com os números do texto. Nessa mesma execução, as seções 3 a 6 mudaram um pouco em relação à RTX (por exemplo, o limiar da CNN foi de 0,506 para 0,510, e os falsos alarmes do YOLO com filtro, de 10,2 para 9,4), porque CPU e GPU arredondam as contas de forma diferente. Por isso, essas saídas não foram gravadas, e a execução completa que vale fica para a RTX do Rafael.
+As saídas gravadas vêm de uma execução completa na RTX 3050 do Rafael, em 06/11/2026. As seções 1 a 6 reproduziram as saídas originais, e a seção 7 mudou nos números do YOLO (veja Resultados). A seção 8 usa os caches `rldd/` e `rldd_temporal/` gerados pela Luana na CPU de um Apple M5, com os pesos do YOLO da semente 42 do Rafael. Isso foi conferido em 2 clipes: o P(fechado) do cache tem correlação de 0,99 com essa semente, contra 0,72 a 0,87 com as sementes 1 e 2. A diferença que sobra deve vir do MediaPipe em Mac e em Windows, então uma extração nova deve ser feita toda numa máquina só. Numa execução completa no M5, as seções 3 a 6 mudaram um pouco (por exemplo, os falsos alarmes do YOLO com filtro foram de 10,2 para 9,4), porque CPU e GPU arredondam as contas de forma diferente.
 
 ## Dados
 
@@ -82,7 +82,7 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 - **Classificadores:** o YOLO supera a MobileNet em recall, com filtro (+10,8 pontos, intervalo de +3,5 a +19,8). Ele não supera o EAR de forma conclusiva (+1,3 pontos, intervalo de -7,5 a +13,7).
 - **No MRL, em 8 pessoas novas:** acurácia de 97,7% no YOLO e 96,8% na MobileNet.
 - **Filtro:** com o mesmo limiar de olho, não perdeu microssonos na calibração. Parte do ganho de recall vem de um limiar mais baixo, que também aumenta os alarmes fora de bocejo.
-- **Agente de RL (seção 7, linha do tempo completa, 11 dobras por vídeo, 5 sementes):** não supera a regra em nenhum λ. Com YOLO e λ = 10, acha 143 de 165 episódios de 1 s ou mais com 15,4 falsos alarmes (4,2 fortes), contra 149 e 10 da regra com piso. Aprende sozinho a ignorar o bocejo e avisa com 0,8 s quando já houve 3 ou mais fechamentos longos no último minuto. A tecla simulada tira de 6% a 22% dos falsos alarmes no mesmo λ.
+- **Agente de RL (seção 7, linha do tempo completa, 11 dobras por vídeo, 5 sementes):** não supera a regra em nenhum λ. Com YOLO e λ = 10, acha 148,6 de 165 episódios de 1 s ou mais com 13,4 falsos alarmes (2,2 fortes), contra 149 e 10 da regra com piso. Esses números do YOLO mudam com a GPU: numa RTX 4060, foram 143 e 15,4 (4,2 fortes), enquanto os do EAR e da regra não mudaram. Por isso, diferenças de poucos episódios entre o agente e a regra não contam. Aprende sozinho a ignorar o bocejo e avisa com 0,8 s quando já houve 3 ou mais fechamentos longos no último minuto. A tecla simulada tira até 23% dos falsos alarmes no mesmo λ, mas nenhum com YOLO e λ = 10.
 - **Piso de 3 s ignorando o filtro de bocejo:** custa 2 alarmes com o YOLO e 22 com o EAR, nos 44 vídeos.
 - **Piscadas (YOLO, semente 42, com filtro, 46 min):** 8 alarmes atravessam os 710 buracos de até 0,5 s, cerca de 1%. No total são 27 alarmes, dos quais 17 estão em buracos longos sem rótulo.
 - **Falsos alarmes em pessoas acordadas (seção 8.2, UTA-RLDD, 9,5 h, regra da demo a 10 fps):** 6,7 por hora (IC95% de 0,7 a 16). 54 das 60 pessoas não têm nenhum, uma pessoa dá 40 dos 64, e as 5 com mais alarmes somam 97%. As 3 primeiras têm EAR de olho aberto de 0,19 a 0,20, contra 0,25 da mediana. Na classe sonolenta, são 63 alarmes por hora.
@@ -113,7 +113,7 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 
 ## Próximos passos
 
-1. **Execução completa do notebook na RTX do Rafael:** gravar todas as saídas numa mesma máquina e conferir os números do texto, da seção 9, do `README.md` e deste arquivo. Para não refazer a extração de 2,5 h, copie `data/cache/rldd/` e `data/cache/rldd_temporal/`.
+1. **Modelo temporal com entrada mais rica (proposta, a fechar com a Luana):** acrescentar posição da cabeça e um grupo pequeno de blendshapes do MediaPipe, dar o PERCLOS e os atributos também à rede (entrada híbrida) e testar um transformer pequeno ao lado da GRU e da TCN. A logística recebe os mesmos sinais novos, para a comparação ser justa, e um teste de controle com atributos parados do clipe mede o atalho do dia da gravação. Protocolo fixado antes de rodar.
 2. **Demo com webcam (para 12/11):** regra com YOLO, filtro de bocejo e piso de 3 s, FPS reais, estado "sem rosto visível" e os três níveis de alerta. O aviso de sonolência pode usar o PERCLOS do último minuto, com a webcam reamostrada para 10 fps.
 3. **Falsos alarmes em situações difíceis:** gravações encenadas do grupo, só como teste, com conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.
 4. **Piso de 3 s na regra principal:** levar o piso da seção 7 para a seção 6 e conferir os números.
