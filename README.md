@@ -6,7 +6,7 @@ Protótipo acadêmico de detecção de sonolência ao volante com câmera e deep
 
 ## Status
 
-A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já roda a linha de base, a CNN de olho, o filtro de bocejo, o agente de RL, o modelo temporal (GRU, TCN e transformer) e a análise de erros dos modelos de sonolência. A demo com webcam ainda falta.
+A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já roda a linha de base, a CNN de olho, o filtro de bocejo, o agente de RL, o modelo temporal (GRU, TCN e transformer), a análise de erros dos modelos de sonolência e uma rede MIL com validação externa no DROZY. A demo com webcam ainda falta.
 
 | Etapa | Estado | Resultado no teste |
 | --- | --- | --- |
@@ -20,6 +20,7 @@ A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já r
 | Modelo temporal (GRU e TCN, UTA-RLDD) | Feito | Não supera o PERCLOS: AUC 0,750 (GRU) e 0,754 (TCN), contra 0,774 do PERCLOS do minuto |
 | Modelo temporal com cabeça, expressões e transformer (protocolo fixado antes) | Feito | Nenhuma rede supera a logística com os mesmos sinais (AUC 0,772): transformer 0,754, TCN 0,736 e GRU 0,729 |
 | Análise de erros dos modelos de sonolência | Feita | AUC de cerca de 0,85 dentro da pessoa e 0,77 entre pessoas; os 9 modelos erram os mesmos vídeos |
+| Rede MIL normalizada pelo 1º minuto, com validação externa no DROZY (protocolo fixado antes) | Feita | Supera a logística com os mesmos sinais no UTA (AUC 0,742 contra 0,654) e no DROZY (0,708 contra 0,575), mas não o PERCLOS absoluto no UTA (0,814) |
 | Demo com webcam | A fazer | |
 
 T é o tempo de olho fechado até o alerta. Usamos T = 1 s, o limite inferior da faixa de microssono do Euro NCAP. Dos 26 episódios do teste, só 14 duram 1 s ou mais: neles, o EAR acha 7 e a CNN, 13. Na calibração, os dois quase empatam (114 e 111 de 228 episódios), e o resultado da CNN varia entre treinos.
@@ -39,6 +40,13 @@ A seção 8.5 deu às redes o movimento da cabeça e as expressões do rosto (bl
 - o rótulo vale para o vídeo inteiro e erra nos primeiros minutos dos vídeos sonolentos;
 - cada classe foi gravada num dia diferente, então a base não permite separar o sono da sessão de gravação.
 
+A seção 8.7 ataca esses problemas, com outro protocolo fixado antes ([`docs/protocolo_8_7.md`](docs/protocolo_8_7.md)). Cada vídeo é normalizado pelo seu 1º minuto, e uma rede MIL (*multiple instance learning*) trata o vídeo como um saco de minutos com um único rótulo, com atenção sobre os minutos. A rede principal (GRU) supera de forma conclusiva a logística com os mesmos sinais normalizados no UTA (+0,089, de +0,007 a +0,181). A vantagem se repete no DROZY (Massoz et al., WACV 2016), com 14 pessoas novas, câmera infravermelha e privação de sono controlada, usando a rede treinada só no UTA (+0,133). Pelo critério fixado antes, o deep learning se justifica na etapa de sonolência, com três limites:
+- no UTA, o PERCLOS absoluto ainda é melhor que a rede;
+- a atenção não acrescenta nada à média simples dos minutos;
+- o DROZY é pequeno.
+
+O transformer como codificador de minuto foi o melhor modelo nas duas bases (0,875 e 0,743), mas era secundário no protocolo.
+
 O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motoristas também aparecem no treino dos autores do FL3D. As escolhas abaixo continuam sendo a proposta atual, a validar com o grupo e nos testes.
 
 ## Proposta de pipeline
@@ -48,7 +56,7 @@ O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motorist
 1. Uma webcam capta o rosto do motorista.
 2. O MediaPipe localiza os olhos.
 3. Um classificador com fine-tuning estima se o olho está fechado em cada frame. Vamos comparar MobileNetV3 e YOLO26n classificadora.
-4. Uma medida do último minuto estima o nível de sonolência. Na seção 8, o PERCLOS empatou com a GRU, a TCN e o transformer e é o candidato mais simples.
+4. Uma medida dos últimos minutos estima o nível de sonolência. Os candidatos são o PERCLOS do minuto, o mais simples, e a rede MIL da seção 8.7, com calibração no 1º minuto de uso, que se transferiu melhor para uma base nova.
 5. Uma regra simples dispara o alerta quando o olho fica fechado por tempo prolongado.
 
 ## Conteúdo
@@ -70,7 +78,7 @@ uv sync
 uv run jupyter nbconvert --to notebook --execute --inplace wakely.ipynb
 ```
 
-Também dá para abrir o `wakely.ipynb` no VS Code com o kernel do `.venv`. A seção 1 do notebook baixa o MRL Eye (342 MB), o FL3D (645 MB, do Kaggle, sem login) e o modelo do MediaPipe para `data/`, a seção 6 baixa o NITYMED (697 MB, do Kaggle) e a seção 8, a pasta `len60` do UTA-RLDD recortado (1,2 GB, do Kaggle). A primeira execução leva cerca de 30 minutos, quase tudo no MediaPipe, mais cerca de 2,5 horas na CPU para extrair os sinais do UTA-RLDD. Depois disso, landmarks e pesos ficam em cache em `data/`.
+Também dá para abrir o `wakely.ipynb` no VS Code com o kernel do `.venv`. A seção 1 do notebook baixa o MRL Eye (342 MB), o FL3D (645 MB, do Kaggle, sem login) e o modelo do MediaPipe para `data/`, a seção 6 baixa o NITYMED (697 MB, do Kaggle) a seção 8, a pasta `len60` do UTA-RLDD recortado (1,2 GB, do Kaggle), e a seção 8.7, o DROZY (2,5 GB, do repositório ORBi da Universidade de Liège; a licença permite só pesquisa e proíbe mostrar as imagens). A primeira execução leva cerca de 30 minutos, quase tudo no MediaPipe, mais cerca de 2,5 horas na CPU para extrair os sinais do UTA-RLDD. Depois disso, landmarks e pesos ficam em cache em `data/`.
 
 ## Prazos
 
