@@ -35,7 +35,7 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
   - `ExtratorRosto` dá a mesma linha de 61 sinais da extração da seção 8.5 (conferido num clipe do UTA: diferença máxima de 0,001 no P(fechado) e zero no resto).
   - `MonitorSonolencia` reamostra para 10 fps, calibra no 1º minuto e, a cada minuto completo, dá o PERCLOS e a P(sonolento) da MIL (média das 5 sementes, saco com os últimos 9 minutos). No DROZY, reproduz as previsões da parte B.
   - Os pesos ficam em `data/modelos/mil_gru4_uta.pt` (148 KB, fora do Git), gravados pela última célula da seção 8.7.
-- **Ainda não existe:** a demo com webcam.
+- **Demo com webcam (`demo/app.py`, 08/11/2026):** webcam do notebook → `ExtratorRosto` → regra de `demo/alerta.py` (YOLO, T = 1 s, filtro de bocejo, piso de 3 s e 6 s) + `MonitorSonolencia` (PERCLOS e MIL) → máquina de estados → painel no navegador (`demo/painel.html`, em http://localhost:8765), com o rosto espelhado, sons e as teclas F (alarme falso, só registra) e R (recalibrar). Rode da raiz do repositório: `uv run python demo/app.py` (`--camera 1` para outra câmera, `--video arquivo.mp4` para testar com vídeo, `--log eventos.csv` para registrar só os eventos). A regra ao vivo repete a do notebook nos 44 vídeos do FL3D (163 de 163 avisos de microssono, 12 de 12 do piso). Os tempos da máquina de estados (10 s sem rosto, 60 s de histerese, 5 min entre avisos de sonolência) são escolhas da demo e não foram validados. A demo ainda usa só o YOLO, sem a fusão da seção 6.3.
 
 ## Estrutura do notebook
 
@@ -46,7 +46,7 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 | 3 | MobileNetV3-Small no MRL Eye, com divisão por pessoa |
 | 4 | CNN no vídeo e ajustes do sinal (4.2), com validação cruzada |
 | 5 | Comparação entre MobileNetV3 e YOLO26n-cls, com 5 sementes |
-| 6 | Falsos alarmes: filtro de bocejo (6.1) e piscadas via NITYMED (6.2) |
+| 6 | Falsos alarmes: filtro de bocejo (6.1), piscadas via NITYMED (6.2) e fusão do EAR com o YOLO (6.3) |
 | 7 | Agente de RL no alerta: Q-learning com tabela, curva por λ, tecla "foi alarme falso" e mapa da política |
 | 8 | Modelo temporal no UTA-RLDD: extração (8.1), análise inicial e falsos alarmes (8.2), PERCLOS e logística (8.3), GRU e TCN (8.4), cabeça, expressões e transformer (8.5), análise de erros (8.6), MIL com normalização pelo 1º minuto e validação externa no DROZY (8.7) |
 | 9 | Resumo e próximos passos |
@@ -95,6 +95,7 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 - **Filtro:** com o mesmo limiar de olho, não perdeu microssonos na calibração. Parte do ganho de recall vem de um limiar mais baixo, que também aumenta os alarmes fora de bocejo.
 - **Agente de RL (seção 7, linha do tempo completa, 11 dobras por vídeo, 5 sementes):** não supera a regra em nenhum λ. Com YOLO e λ = 10, acha 148,6 de 165 episódios de 1 s ou mais com 13,4 falsos alarmes (2,2 fortes), contra 149 e 10 da regra com piso. Esses números do YOLO mudam com a GPU: numa RTX 4060, foram 143 e 15,4 (4,2 fortes), enquanto os do EAR e da regra não mudaram. Por isso, diferenças de poucos episódios entre o agente e a regra não contam. Aprende sozinho a ignorar o bocejo e avisa com 0,8 s quando já houve 3 ou mais fechamentos longos no último minuto. A tecla simulada tira até 23% dos falsos alarmes no mesmo λ, mas nenhum com YOLO e λ = 10.
 - **Piso de 3 s ignorando o filtro de bocejo:** custa 2 alarmes com o YOLO e 22 com o EAR, nos 44 vídeos.
+- **Fusão EAR + YOLO (seção 6.3, protocolo fixado antes de rodar, 08/11/2026):** a média dos dois sinais, com filtro, acha 90,7% dos episódios de 1 s ou mais (149,6 de 165) com 6,0 falsos alarmes. Ganha do YOLO em acertos (+3,9 pontos, de +0,8 a +7,7) e do EAR em falsos alarmes (−10, de −21 a −1,2). O mínimo dos dois corta falsos alarmes (5,6), mas não acha mais. No holdout, com o limiar escolhido na calibração (0,35 na semente 42), a média empata com o YOLO (12,4 de 14, 0,6 falso alarme). A ideia veio de olhar as seções 5 e 6, nos mesmos 44 vídeos, então o ganho pode ser um pouco otimista.
 - **Piscadas (YOLO, semente 42, com filtro, 46 min):** 8 alarmes atravessam os 710 buracos de até 0,5 s, cerca de 1%. No total são 27 alarmes, dos quais 17 estão em buracos longos sem rótulo.
 - **Falsos alarmes em pessoas acordadas (seção 8.2, UTA-RLDD, 9,5 h, regra da demo a 10 fps):** 6,7 por hora (IC95% de 0,7 a 16). 54 das 60 pessoas não têm nenhum, uma pessoa dá 40 dos 64, e as 5 com mais alarmes somam 97%. As 3 primeiras têm EAR de olho aberto de 0,19 a 0,20, contra 0,25 da mediana. Na classe sonolenta, são 63 alarmes por hora.
 - **Sonolência em 1 minuto (seção 8, 5 dobras por pessoa, 1.126 clipes):** PERCLOS com limiar AUC 0,774; regressão logística 0,746; GRU 0,750 ± 0,009; TCN 0,754 ± 0,014 (5 sementes). Nenhuma diferença é conclusiva (GRU - PERCLOS: -0,024, de -0,059 a +0,012). Por vídeo, a GRU acerta 74,6%, e o PERCLOS, 65,5%. O artigo da base fez 65,2% por vídeo, com 3 classes e outro protocolo.
@@ -145,10 +146,11 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 1. **Deep learning na sonolência, depois da seção 8.7:** a MIL normalizada pelo 1º minuto entra na demo, ao lado do PERCLOS (`demo/sonolencia.py`). Falta:
    - testar a MIL-Transformer, que foi a melhor, num protocolo novo;
    - atacar o custo da normalização, que tira o sono de quem já começa sonolento.
-2. **Demo com webcam (para 12/11):** regra com YOLO, filtro de bocejo e piso de 3 s, FPS reais, estado "sem rosto visível" e os três níveis de alerta. O aviso de sonolência usa o `MonitorSonolencia` de `demo/sonolencia.py` (MIL e PERCLOS), e o `ExtratorRosto` também entrega o P(fechado) e a boca da regra, com um MediaPipe só por quadro. A webcam precisa de pelo menos 10 fps.
-3. **Falsos alarmes em situações difíceis:** gravações encenadas do grupo, só como teste, com conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.
-4. **Piso de 3 s na regra principal:** levar o piso da seção 7 para a seção 6 e conferir os números.
-5. **Linha de base por pessoa (próxima etapa):** começo do uso como referência, contra o viés do olho pequeno. Avaliar fora do UTA-RLDD (seção 8.6).
+2. **Demo com webcam (para 12/11): feita** (`demo/app.py`). Falta medir FPS na máquina da apresentação (12 a 19 quadros/s na webcam de uma RTX 4060) e ensaiar com pelo menos 2 minutos de câmera, para a MIL aparecer. O aviso de sonolência usa o `MonitorSonolencia` de `demo/sonolencia.py` (MIL e PERCLOS), e o `ExtratorRosto` também entrega o P(fechado) e a boca da regra, com um MediaPipe só por quadro. A webcam precisa de pelo menos 10 fps.
+3. **Fusão na demo:** trocar o P(fechado) do YOLO pela média com o EAR (limiar 0,35, referência do EAR no começo do uso) e confirmar a fusão numa base com microssonos marcados além do FL3D.
+4. **Falsos alarmes em situações difíceis:** gravações encenadas do grupo, só como teste, com conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.
+5. **Piso de 3 s na regra principal:** levar o piso da seção 7 para a seção 6 e conferir os números.
+6. **Linha de base por pessoa (próxima etapa):** começo do uso como referência, contra o viés do olho pequeno. Avaliar fora do UTA-RLDD (seção 8.6).
 
 ## Pontos fracos atuais
 
