@@ -30,7 +30,11 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 - **Piso de 3 s (proposto):** olho fechado por 3 s ou mais dispara o aviso forte mesmo durante bocejo, para não silenciar quem dorme de boca aberta. Foi testado na seção 7 (custa 2 alarmes com o YOLO nos 44 vídeos), mas ainda não entrou na regra das seções 2 a 6.
 - **Agente de RL (seção 7):** é um experimento. Ele não supera a regra e não faz parte do pipeline.
 - **Modelo temporal (seção 8):** GRU, TCN e transformer sobre 1 minuto de sinais, no UTA-RLDD, também com cabeça e expressões (8.5). Nenhum supera o PERCLOS do minuto.
-- **Rede MIL (seção 8.7):** cada vídeo é normalizado pelo seu 1º minuto, e o vídeo vira um saco de minutos com atenção. Ela supera a logística com os mesmos sinais no UTA e no DROZY. Para o aviso de sonolência, os candidatos são a MIL, com calibração no 1º minuto de uso, e o PERCLOS. Nenhum dos dois está no pipeline ainda.
+- **Rede MIL (seção 8.7):** cada vídeo é normalizado pelo seu 1º minuto, e o vídeo vira um saco de minutos com atenção. Ela supera a logística com os mesmos sinais no UTA e no DROZY. A demo mostra lado a lado a MIL, com calibração no 1º minuto de uso, e o PERCLOS do último minuto.
+- **`demo/sonolencia.py`:** módulo da demo, sem depender do notebook.
+  - `ExtratorRosto` dá a mesma linha de 61 sinais da extração da seção 8.5 (conferido num clipe do UTA: diferença máxima de 0,001 no P(fechado) e zero no resto).
+  - `MonitorSonolencia` reamostra para 10 fps, calibra no 1º minuto e, a cada minuto completo, dá o PERCLOS e a P(sonolento) da MIL (média das 5 sementes, saco com os últimos 9 minutos). No DROZY, reproduz as previsões da parte B.
+  - Os pesos ficam em `data/modelos/mil_gru4_uta.pt` (148 KB, fora do Git), gravados pela última célula da seção 8.7.
 - **Ainda não existe:** a demo com webcam.
 
 ## Estrutura do notebook
@@ -47,7 +51,7 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 | 8 | Modelo temporal no UTA-RLDD: extração (8.1), análise inicial e falsos alarmes (8.2), PERCLOS e logística (8.3), GRU e TCN (8.4), cabeça, expressões e transformer (8.5), análise de erros (8.6), MIL com normalização pelo 1º minuto e validação externa no DROZY (8.7) |
 | 9 | Resumo e próximos passos |
 
-Funções principais: `fechamento`, `bocejo_ativo`, `alertas` e `avaliar_eventos` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2), `rodar_agente`, `rodar_regra` e `treinar_agente` (seção 7), `extrair_pessoa`, `atributos`, `avisos_regra`, `metricas_8` e `prever_temporal` (seção 8), `extrair_pessoa_rico`, `carregar_rico`, `treinar_85`, `prever_85` e `auc_dentro_da_pessoa` (seções 8.5 e 8.6), `normalizar_videos`, `MILSono`, `treinar_87`, `prever_87`, `extrair_drozy` e `prever_b` (seção 8.7).
+Funções principais: `fechamento`, `bocejo_ativo`, `alertas` e `avaliar_eventos` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2), `rodar_agente`, `rodar_regra` e `treinar_agente` (seção 7), `extrair_pessoa`, `atributos`, `avisos_regra`, `metricas_8` e `prever_temporal` (seção 8), `extrair_pessoa_rico`, `carregar_rico`, `treinar_85`, `prever_85` e `auc_dentro_da_pessoa` (seções 8.5 e 8.6), `normalizar_videos`, `MILSono`, `treinar_87`, `prever_87`, `extrair_drozy` e `prever_b` (seção 8.7). A última célula da seção 8.7 grava os pesos da MIL para a demo.
 
 As saídas gravadas vêm de uma execução completa na RTX 3050 do Rafael, em 07/11/2026, que incluiu as seções 8.5 a 8.7. As seções 1 a 6 reproduziram as saídas originais, e a seção 7 mudou nos números do YOLO (veja Resultados). A seção 8 usa os caches `rldd/` e `rldd_temporal/` gerados pela Luana na CPU de um Apple M5, com os pesos do YOLO da semente 42 do Rafael. Isso foi conferido em 2 clipes: o P(fechado) do cache tem correlação de 0,99 com essa semente, contra 0,72 a 0,87 com as sementes 1 e 2. A diferença que sobra deve vir do MediaPipe em Mac e em Windows, então uma extração nova deve ser feita toda numa máquina só. Numa execução completa no M5, as seções 3 a 6 mudaram um pouco (por exemplo, os falsos alarmes do YOLO com filtro foram de 10,2 para 9,4), porque CPU e GPU arredondam as contas de forma diferente.
 
@@ -138,11 +142,10 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 
 ## Próximos passos
 
-1. **Deep learning na sonolência, depois da seção 8.7:** a MIL normalizada pelo 1º minuto é a candidata. Falta:
-   - decidir se a demo usa a MIL ou o PERCLOS;
+1. **Deep learning na sonolência, depois da seção 8.7:** a MIL normalizada pelo 1º minuto entra na demo, ao lado do PERCLOS (`demo/sonolencia.py`). Falta:
    - testar a MIL-Transformer, que foi a melhor, num protocolo novo;
    - atacar o custo da normalização, que tira o sono de quem já começa sonolento.
-2. **Demo com webcam (para 12/11):** regra com YOLO, filtro de bocejo e piso de 3 s, FPS reais, estado "sem rosto visível" e os três níveis de alerta. O aviso de sonolência pode usar o PERCLOS do último minuto, com a webcam reamostrada para 10 fps.
+2. **Demo com webcam (para 12/11):** regra com YOLO, filtro de bocejo e piso de 3 s, FPS reais, estado "sem rosto visível" e os três níveis de alerta. O aviso de sonolência usa o `MonitorSonolencia` de `demo/sonolencia.py` (MIL e PERCLOS), e o `ExtratorRosto` também entrega o P(fechado) e a boca da regra, com um MediaPipe só por quadro. A webcam precisa de pelo menos 10 fps.
 3. **Falsos alarmes em situações difíceis:** gravações encenadas do grupo, só como teste, com conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.
 4. **Piso de 3 s na regra principal:** levar o piso da seção 7 para a seção 6 e conferir os números.
 5. **Linha de base por pessoa (próxima etapa):** começo do uso como referência, contra o viés do olho pequeno. Avaliar fora do UTA-RLDD (seção 8.6).

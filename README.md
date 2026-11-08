@@ -56,7 +56,7 @@ O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motorist
 1. Uma webcam capta o rosto do motorista.
 2. O MediaPipe localiza os olhos.
 3. Um classificador com fine-tuning estima se o olho está fechado em cada frame. Vamos comparar MobileNetV3 e YOLO26n classificadora.
-4. Uma medida dos últimos minutos estima o nível de sonolência. Os candidatos são o PERCLOS do minuto, o mais simples, e a rede MIL da seção 8.7, com calibração no 1º minuto de uso, que se transferiu melhor para uma base nova.
+4. Uma medida dos últimos minutos estima o nível de sonolência. A demo mostra lado a lado o PERCLOS do último minuto, o mais simples, e a rede MIL da seção 8.7, com calibração no 1º minuto de uso, que se transferiu melhor para uma base nova. As duas estão prontas em [`demo/sonolencia.py`](demo/sonolencia.py).
 5. Uma regra simples dispara o alerta quando o olho fica fechado por tempo prolongado.
 
 ## Conteúdo
@@ -64,6 +64,7 @@ O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motorist
 | Arquivo | O que é |
 | --- | --- |
 | [`wakely.ipynb`](wakely.ipynb) | Notebook: dados, linha de base EAR, CNN de olho, avaliação em vídeo, agente de RL no alerta e modelo temporal |
+| [`demo/sonolencia.py`](demo/sonolencia.py) | Extração por quadro, PERCLOS do último minuto e rede MIL ao vivo, para a demo. Usa `data/modelos/mil_gru4_uta.pt`, gravado pela seção 8.7 |
 | [`pyproject.toml`](pyproject.toml) e `uv.lock` | Ambiente (Python 3.12, PyTorch com CUDA, MediaPipe, Ultralytics) |
 | [`docs/pesquisa_wakely.md`](docs/pesquisa_wakely.md) | Pesquisa sobre biologia, indústria, arquitetura, datasets, avaliação e ética |
 | [`docs/pipeline_recomendado.png`](docs/pipeline_recomendado.png) | Diagrama do pipeline |
