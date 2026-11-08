@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wakely · painel</title>
+<style>
+  :root {
+    --fundo: #0e1116; --cartao: #171b22; --borda: #262c36; --texto: #e8ecf1; --suave: #8b95a3;
+    --verde: #2fbf71; --amarelo: #f2c14e; --laranja: #f28c38; --vermelho: #e5484d; --azul: #4c8dff; --cinza: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--fundo); color: var(--texto);
+         font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px;
+           border-bottom: 1px solid var(--borda); }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
+  header small { color: var(--suave); }
+  main { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; padding: 18px 22px; max-width: 1600px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px; padding: 18px; }
+  #estado { display: flex; align-items: center; gap: 22px; min-height: 170px; transition: background .3s, border-color .3s; }
+  #anel { width: 120px; height: 120px; border-radius: 50%; border: 12px solid var(--cinza); flex: none;
+          display: grid; place-items: center; font-size: 34px; transition: border-color .3s; }
+  #nivel { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: var(--suave); }
+  #texto { font-size: 34px; font-weight: 700; margin-top: 4px; }
+  #sub { color: var(--suave); margin-top: 6px; }
+  .piscar { animation: piscar .6s infinite alternate; }
+  @keyframes piscar { from { filter: brightness(1); } to { filter: brightness(1.6); } }
+  .linha { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  .rotulo { color: var(--suave); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+  .valor { font-size: 30px; font-weight: 700; margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
+  .barra { position: relative; height: 12px; background: #0b0e12; border-radius: 6px; overflow: hidden; }
+  .barra > i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 6px; background: var(--azul);
+               transition: width .2s; }
+  .marca { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff8; }
+  .nota { color: var(--suave); font-size: 13px; margin-top: 6px; }
+  #camera { position: relative; border: 6px solid var(--cinza); border-radius: 18px; overflow: hidden; background: #000;
+            transition: border-color .3s; }
+  #video { display: block; width: 100%; aspect-ratio: 16/9; object-fit: contain; background: #000; }
+  #camera .sobre { position: absolute; left: 14px; right: 14px; display: flex; justify-content: space-between; align-items: flex-end;
+                   gap: 12px; pointer-events: none; }
+  #camera .topo { top: 14px; align-items: flex-start; }
+  #camera .base { bottom: 14px; }
+  .etiqueta { background: #000a; backdrop-filter: blur(4px); border-radius: 12px; padding: 8px 14px; }
+  #cam_estado { font-size: 26px; font-weight: 800; }
+  #cam_contador { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #cam_legenda { font-size: 13px; color: #d7dde5; }
+  #cam_vazia { position: absolute; inset: 0; display: grid; place-items: center; color: var(--suave); font-size: 18px; }
+  #eventos { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+  #eventos li { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--borda); font-size: 14px; }
+  #eventos b { min-width: 120px; }
+  #eventos span.t { color: var(--suave); min-width: 64px; font-variant-numeric: tabular-nums; }
+  .botoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  button { background: #222935; color: var(--texto); border: 1px solid var(--borda); border-radius: 10px;
+           padding: 10px 14px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--azul); }
+  button.ativo { background: var(--azul); border-color: var(--azul); }
+  .pilula { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; background: #222935; }
+  footer { color: var(--suave); text-align: center; font-size: 13px; padding: 4px 22px 22px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Wakely</h1>
+  <small id="tecnico">conectando…</small>
+</header>
+
+<main>
+  <section>
+    <div id="camera">
+      <img id="video" alt="sua câmera, espelhada">
+      <div id="cam_vazia">esperando a câmera…</div>
+      <div class="sobre topo">
+        <div class="etiqueta" id="cam_estado">…</div>
+        <div class="etiqueta" id="cam_legenda">olhos: <b style="color:#5ac85a">verde</b> aberto · <b style="color:#e64a3c">vermelho</b> fechado<br>boca: <b style="color:#f0b428">âmbar</b> durante bocejo</div>
+      </div>
+      <div class="sobre base">
+        <div class="etiqueta"><div class="rotulo" style="color:#d7dde5">olho fechado há</div><div id="cam_contador">0,0 s</div></div>
+      </div>
+    </div>
+    <div class="botoes">
+      <button id="som">🔇 Ativar som</button>
+      <button id="falso" title="tecla F">Foi alarme falso (F)</button>
+      <button id="recal" title="tecla R">Recalibrar (R)</button>
+      <button id="grande" title="tecla C">Câmera em tela cheia (C)</button>
+    </div>
+  </section>
+
+  <section>
+    <div id="estado" class="cartao">
+      <div id="anel">·</div>
+      <div>
+        <div id="nivel">iniciando</div>
+        <div id="texto">Iniciando a câmera…</div>
+        <div id="sub"></div>
+      </div>
+    </div>
+
+    <div class="linha">
+      <div class="cartao">
+        <div class="rotulo">Olho fechado há</div>
+        <div class="valor" id="fechado_ha">0,0 s</div>
+        <div class="barra"><i id="b_fechado"></i>
+          <span class="marca" style="left:16.7%"></span><span class="marca" style="left:50%"></span></div>
+        <div class="nota">marcas: 1 s (microssono) e 3 s (sono) · escala até 6 s</div>
+      </div>
+      <div class="cartao">
+        <div class="rotulo">P(olho fechado), agora</div>
+        <div class="valor" id="p_fech">–</div>
+        <div class="barra"><i id="b_pfech"></i><span class="marca" id="m_olho"></span></div>
+        <div class="nota" id="boca">boca: –</div>
+      </div>
+    </div>
+
+    <div class="linha">
+      <div class="cartao">
+        <div class="rotulo">PERCLOS do último minuto</div>
+        <div class="valor" id="perclos">–</div>
+        <div class="barra"><i id="b_perclos"></i><span class="marca" id="m_perclos"></span></div>
+        <div class="nota" id="n_perclos">fração do minuto com olho fechado · sem treino</div>
+      </div>
+      <div class="cartao">
+        <div class="rotulo">Sonolência pela rede MIL</div>
+        <div class="valor" id="mil">–</div>
+        <div class="barra"><i id="b_mil"></i><span class="marca" style="left:50%"></span></div>
+        <div class="nota" id="n_mil">deep learning · compara com o seu 1º minuto</div>
+      </div>
+    </div>
+    <div class="cartao" style="margin-top:18px">
+      <div class="rotulo">Eventos</div>
+      <ul id="eventos"><li><span class="t"></span><span>nenhum ainda</span></li></ul>
+    </div>
+  </section>
+</main>
+<footer>Protótipo acadêmico da Insper AI. Não é dispositivo de segurança: nunca usar dirigindo. Nada é gravado.</footer>
+
+<script>
+const CORES = { "calibrando": "--azul", "normal": "--verde", "atencao": "--amarelo", "sonolento": "--laranja",
+                "microssono": "--vermelho", "sono": "--vermelho", "sem resposta": "--vermelho", "sem rosto": "--cinza" };
+const ICONES = { "calibrando": "⏳", "normal": "✓", "atencao": "!", "sonolento": "☕", "microssono": "👁",
+                 "sono": "⚠", "sem resposta": "⛔", "sem rosto": "?" };
+const ROTULOS = { "calibrando": "calibrando", "normal": "normal", "atencao": "atenção", "sonolento": "sonolento",
+                  "microssono": "microssono", "sono": "sono", "sem resposta": "sem resposta", "sem rosto": "sem rosto" };
+const $ = id => document.getElementById(id);
+const cor = n => getComputedStyle(document.documentElement).getPropertyValue(CORES[n] || "--cinza").trim();
+const pct = x => (x * 100).toFixed(1).replace(".", ",") + "%";
+const largura = (el, f) => { el.style.width = Math.max(0, Math.min(1, f)) * 100 + "%"; };
+
+// ---------------------------------------------------------------- sons (Web Audio, sem arquivos)
+let audio = null, ultimoSom = 0, primeiro = true;
+function bipe(freq, ini, dur, vol = 0.25, tipo = "sine") {
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = tipo; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, audio.currentTime + ini);
+  g.gain.linearRampToValueAtTime(vol, audio.currentTime + ini + 0.02);
+  g.gain.linearRampToValueAtTime(0, audio.currentTime + ini + dur);
+  o.connect(g).connect(audio.destination);
+  o.start(audio.currentTime + ini); o.stop(audio.currentTime + ini + dur + 0.05);
+}
+const SONS = {
+  "atencao":      () => { bipe(660, 0, .25, .15); bipe(880, .3, .3, .15); },
+  "sonolento":    () => { for (let k = 0; k < 3; k++) bipe(740, k * .35, .25, .25); },
+  "microssono":   () => { for (let k = 0; k < 6; k++) bipe(1200, k * .18, .12, .35, "square"); },
+  "sono":         () => { for (let k = 0; k < 8; k++) bipe(k % 2 ? 900 : 1300, k * .25, .22, .4, "sawtooth"); },
+  "sem resposta": () => { for (let k = 0; k < 14; k++) bipe(k % 2 ? 900 : 1400, k * .2, .18, .5, "sawtooth"); },
+  "sem rosto":    () => { bipe(330, 0, .4, .15); },
+};
+$("som").onclick = () => {
+  if (!audio) { audio = new (window.AudioContext || window.webkitAudioContext)(); }
+  audio.resume(); $("som").textContent = "🔊 Som ativado"; $("som").classList.add("ativo");
+  SONS["atencao"]();
+};
+
+// ---------------------------------------------------------------- ações
+const acao = t => fetch("/acao/" + t);
+$("falso").onclick = () => acao("falso");
+$("recal").onclick = () => acao("recalibrar");
+const telaCheia = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else $("camera").requestFullscreen?.().catch(() => {});
+};
+$("grande").onclick = telaCheia;
+document.addEventListener("keydown", e => {
+  if (e.key === "f" || e.key === "F") acao("falso");
+  if (e.key === "r" || e.key === "R") acao("recalibrar");
+  if (e.key === "c" || e.key === "C") telaCheia();
+});
+
+// ---------------------------------------------------------------- câmera: um quadro por vez (funciona em qualquer navegador)
+let urlQuadro = null;
+async function quadro() {
+  try {
+    const r = await fetch("/quadro.jpg", { cache: "no-store" });
+    if (r.status === 200) {
+      const u = URL.createObjectURL(await r.blob());
+      $("video").src = u;
+      if (urlQuadro) URL.revokeObjectURL(urlQuadro);
+      urlQuadro = u;
+      $("cam_vazia").hidden = true;
+    }
+  } catch (err) { $("cam_vazia").hidden = false; }
+  setTimeout(quadro, 50);
+}
+quadro();
+
+// ---------------------------------------------------------------- atualização
+function desenhar(e) {
+  const c = cor(e.nivel);
+  $("estado").style.borderColor = c;
+  $("estado").style.background = `linear-gradient(90deg, ${c}22, var(--cartao) 60%)`;
+  $("anel").style.borderColor = c;
+  $("anel").textContent = ICONES[e.nivel] || "·";
+  $("nivel").textContent = ROTULOS[e.nivel] || e.nivel;
+  $("texto").textContent = e.texto;
+  const urgente = ["microssono", "sono", "sem resposta"].includes(e.nivel);
+  $("estado").classList.toggle("piscar", urgente);
+  $("camera").style.borderColor = c;
+  $("camera").classList.toggle("piscar", urgente);
+  $("cam_estado").textContent = e.texto;
+  $("cam_estado").style.color = c;
+  $("cam_contador").textContent = (e.fechado_ha || 0).toFixed(1).replace(".", ",") + " s";
+  $("cam_contador").style.color = e.fechado_ha >= 3 ? cor("sono") : e.fechado_ha >= 1 ? cor("sonolento") : "#ffffff";
+  let sub = "";
+  if (e.calibrando && e.seg_calibrar != null) sub = `faltam ${Math.ceil(e.seg_calibrar)} s de calibração · o alarme de olho fechado já funciona`;
+  else if (e.seg_proxima_mil != null) sub = `próxima leitura de sonolência em ${Math.ceil(e.seg_proxima_mil)} s · ${e.minutos_mil} min analisados`;
+  if (e.micros_5min) sub += ` · ${e.micros_5min} microssono(s) nos últimos 5 min`;
+  $("sub").textContent = sub;
+
+  $("fechado_ha").textContent = (e.fechado_ha || 0).toFixed(1).replace(".", ",") + " s";
+  largura($("b_fechado"), (e.fechado_ha || 0) / 6);
+  $("b_fechado").style.background = e.fechado_ha >= 3 ? cor("sono") : e.fechado_ha >= 1 ? cor("sonolento") : "var(--azul)";
+
+  $("p_fech").textContent = e.p_fech == null ? "sem rosto" : pct(e.p_fech);
+  largura($("b_pfech"), e.p_fech || 0);
+  $("m_olho").style.left = (e.limiar_olho * 100) + "%";
+  $("b_pfech").style.background = e.fechado ? cor("microssono") : "var(--azul)";
+  $("boca").innerHTML = e.boca == null ? "boca: –" :
+    `boca: ${e.boca.toFixed(2).replace(".", ",")} ${e.bocejo ? '<span class="pilula">bocejo: olho fechado não conta para o microssono</span>' : ""}`;
+
+  if (e.perclos == null) { $("perclos").textContent = "aguardando 1 min"; largura($("b_perclos"), 0); }
+  else {
+    $("perclos").textContent = pct(e.perclos);
+    largura($("b_perclos"), e.perclos / 0.2);
+    $("b_perclos").style.background = e.perclos >= e.limiar_perclos ? cor("atencao") : cor("normal");
+  }
+  $("m_perclos").style.left = (e.limiar_perclos / 0.2 * 100) + "%";
+  $("n_perclos").textContent = `limiar ${pct(e.limiar_perclos)} (escolhido no UTA-RLDD) · escala até 20% · sem treino`;
+
+  if (e.p_mil == null) { $("mil").textContent = e.calibrando ? "calibrando" : "aguardando 1 min"; largura($("b_mil"), 0); }
+  else {
+    $("mil").textContent = pct(e.p_mil);
+    largura($("b_mil"), e.p_mil);
+    $("b_mil").style.background = e.p_mil >= e.limiar_mil ? cor("atencao") : cor("normal");
+  }
+
+  const ev = e.eventos || [];
+  $("eventos").innerHTML = ev.length ? ev.map(x =>
+    `<li><span class="t">${x.t.toFixed(1).replace(".", ",")} s</span><b style="color:${cor(x.tipo)}">${ROTULOS[x.tipo] || x.tipo}</b><span>${x.detalhe}</span></li>`
+  ).join("") : '<li><span class="t"></span><span>nenhum ainda</span></li>';
+
+  $("tecnico").textContent = e.fps ? `${e.fps.toFixed(0)} quadros/s · ${e.ms.toFixed(0)} ms por quadro` : "conectando…";
+  if (!e.video) $("camera").hidden = true;
+
+  // sons novos (na primeira leitura, só marca o ponto de partida)
+  for (const s of e.sons || []) {
+    if (s.id > ultimoSom) {
+      ultimoSom = s.id;
+      if (!primeiro && audio && SONS[s.tipo]) SONS[s.tipo]();
+    }
+  }
+  primeiro = false;
+}
+async function ciclo() {
+  try { desenhar(await (await fetch("/estado")).json()); }
+  catch (err) { $("tecnico").textContent = "sem conexão com a demo"; }
+  setTimeout(ciclo, 200);
+}
+ciclo();
+</script>
+</body>
+</html>
