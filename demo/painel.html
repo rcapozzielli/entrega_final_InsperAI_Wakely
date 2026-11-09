@@ -261,7 +261,8 @@ function desenhar(e) {
   ).join("") : '<li><span class="t"></span><span>nenhum ainda</span></li>';
 
   $("tecnico").textContent = e.fps ? `${e.fps.toFixed(0)} quadros/s · ${e.ms.toFixed(0)} ms por quadro` : "conectando…";
-  if (!e.video) $("camera").hidden = true;
+  // só esconde a câmera quando a demo já iniciou e foi aberta com --sem-video (antes de iniciar, o estado não diz)
+  $("camera").hidden = e.iniciado === true && e.video === false;
 
   // sons novos (na primeira leitura, só marca o ponto de partida)
   for (const s of e.sons || []) {
