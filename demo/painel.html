@@ -59,6 +59,12 @@
   button.ativo { background: var(--azul); border-color: var(--azul); }
   .pilula { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; background: #222935; }
   footer { color: var(--suave); text-align: center; font-size: 13px; padding: 4px 22px 22px; }
+  /* pesos da atenção da MIL, um por minuto do saco */
+  #pesos { display: flex; align-items: flex-end; gap: 4px; height: 44px; margin-top: 8px; }
+  #pesos .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  #pesos .col i { display: block; width: 100%; background: var(--azul); border-radius: 3px 3px 0 0; min-height: 2px; }
+  #pesos .col span { font-size: 10px; color: var(--suave); margin-top: 2px; }
+  #pesos .col.maior i { background: var(--laranja); }
   /* entradas da MIL */
   #entradas { margin-top: 18px; }
   .sinais { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; margin-top: 10px; }
@@ -152,10 +158,13 @@
         <div class="nota" id="n_perclos">fração do minuto com olho fechado · sem treino</div>
       </div>
       <div class="cartao">
-        <div class="rotulo">Sonolência pela rede MIL</div>
+        <div class="rotulo">Sonolência pela rede MIL (minutos desde a calibração)</div>
         <div class="valor" id="mil">–</div>
         <div class="barra"><i id="b_mil"></i><span class="marca" style="left:50%"></span></div>
         <div class="nota" id="n_mil">deep learning · compara com o seu 1º minuto</div>
+        <div class="nota" id="mil_ultimo"></div>
+        <div id="pesos" title="peso da atenção de cada minuto no saco"></div>
+        <div class="nota" id="n_pesos"></div>
       </div>
     </div>
     <div class="cartao" style="margin-top:18px">
@@ -367,6 +376,20 @@ function desenhar(e) {
     $("mil").textContent = pct(e.p_mil);
     largura($("b_mil"), e.p_mil);
     $("b_mil").style.background = e.p_mil >= e.limiar_mil ? cor("atencao") : cor("normal");
+  }
+  // o saco "lembra" o minuto mais sonolento; o último minuto sozinho e a atenção mostram de onde vem a P
+  const pesos = e.pesos_mil || [];
+  if (e.p_mil == null || !pesos.length) {
+    $("mil_ultimo").textContent = ""; $("pesos").innerHTML = ""; $("n_pesos").textContent = "";
+  } else {
+    $("mil_ultimo").textContent = `último minuto sozinho: ${pct(e.p_mil_ultimo)}`;
+    const maior = pesos.indexOf(Math.max(...pesos)), topo = Math.max(...pesos);
+    $("pesos").innerHTML = pesos.map((w, i) =>
+      `<div class="col${i === maior && pesos.length > 1 ? " maior" : ""}" title="minuto ${e.minuto_ini_saco + i}: peso ${fmt(w, 2)}">` +
+      `<i style="height:${Math.max(4, w / topo * 100) * 0.7}%"></i><span>${e.minuto_ini_saco + i}</span></div>`).join("");
+    $("n_pesos").textContent = pesos.length > 1
+      ? `atenção por minuto do saco: o minuto ${e.minuto_ini_saco + maior} pesa mais (${fmt(pesos[maior] * 100, 0)}%)`
+      : "atenção: um minuto só no saco";
   }
 
   const ev = e.eventos || [];

@@ -315,7 +315,9 @@ class MonitorSonolencia:
         self.amostras, self.minutos = [], []             # minuto atual e minutos completos (o 1º é a calibração)
         self.ultimas = []                                # últimas 600 amostras, para o PERCLOS deslizante
         self.p_mil, self.pesos = None, None
-        self.ref_canais = None                           # mediana do 1º minuto (P(fechado), EAR, boca), para o painel
+        self.p_ultimo = None                             # P(sonolento) com só o último minuto no saco (para o painel)
+        self.primeiro_do_saco = None                     # número do minuto mais antigo do saco (1 = calibração)
+        self.ref_canais = None                          # mediana do 1º minuto (P(fechado), EAR, boca), para o painel
         self.atrib_cal = self.atrib_ultimo = None        # 16 atributos do 1º minuto e do último minuto completo
 
     def _sem_rosto(self):
@@ -349,6 +351,9 @@ class MonitorSonolencia:
             if len(self.minutos) >= 2:
                 saco = np.stack(self.minutos[1:][-self.max_minutos:])
                 self.p_mil, self.pesos = self.mil.prever(self.minutos[0], saco)
+                self.primeiro_do_saco = len(self.minutos) - len(saco) + 1
+                # o saco "lembra" o minuto mais sonolento; o último minuto sozinho mostra como a pessoa está agora
+                self.p_ultimo = self.p_mil if len(saco) == 1 else self.mil.prever(self.minutos[0], saco[-1:])[0]
 
     def perclos(self):
         if len(self.ultimas) < self.n:
@@ -369,7 +374,9 @@ class MonitorSonolencia:
                 "perclos_alto": None if per is None else per >= self.cfg["limiar_perclos"],
                 "p_mil": self.p_mil,
                 "sonolento_mil": None if self.p_mil is None else self.p_mil >= self.cfg["limiar_mil"],
-                "pesos_atencao": self.pesos}
+                "pesos_atencao": self.pesos,
+                "p_ultimo_minuto": self.p_ultimo,
+                "primeiro_minuto_do_saco": self.primeiro_do_saco}
 
     def entradas_ao_vivo(self, pontos=120):
         """O que a MIL recebe, para o painel: os 4 canais por quadro do último minuto (reduzidos a `pontos`

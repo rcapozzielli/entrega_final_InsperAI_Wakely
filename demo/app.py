@@ -218,6 +218,8 @@ class Demo:
                     "seg_proxima_mil": num(mon["segundos_para_proxima_mil"]), "minutos_mil": mon["minutos_no_saco"],
                     "perclos": num(mon["perclos"]), "limiar_perclos": self.monitor.cfg["limiar_perclos"],
                     "p_mil": num(mon["p_mil"]), "limiar_mil": self.monitor.cfg["limiar_mil"],
+                    "p_mil_ultimo": num(mon["p_ultimo_minuto"]), "pesos_mil": lista(mon["pesos_atencao"], 3),
+                    "minuto_ini_saco": mon["primeiro_minuto_do_saco"],
                     "fps": num(fps_ema), "ms": num(ms_ema),
                     "eventos": [{"t": round(a, 1), "tipo": b, "detalhe": c} for a, b, c in self.maquina.eventos[-8:]][::-1],
                     "sons": self.sons, "video": not self.args.sem_video,
