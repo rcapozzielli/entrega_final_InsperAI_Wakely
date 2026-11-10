@@ -59,6 +59,25 @@
   button.ativo { background: var(--azul); border-color: var(--azul); }
   .pilula { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; background: #222935; }
   footer { color: var(--suave); text-align: center; font-size: 13px; padding: 4px 22px 22px; }
+  /* pesos da atenção da MIL, um por minuto do saco */
+  #pesos { display: flex; align-items: flex-end; gap: 4px; height: 44px; margin-top: 8px; }
+  #pesos .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  #pesos .col i { display: block; width: 100%; background: var(--azul); border-radius: 3px 3px 0 0; min-height: 2px; }
+  #pesos .col span { font-size: 10px; color: var(--suave); margin-top: 2px; }
+  #pesos .col.maior i { background: var(--laranja); }
+  /* entradas da MIL */
+  #entradas { margin-top: 18px; }
+  .sinais { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; margin-top: 10px; }
+  .sinal .topo_sinal { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); }
+  .sinal .topo_sinal b { color: var(--texto); font-variant-numeric: tabular-nums; }
+  .sinal canvas { display: block; width: 100%; height: 54px; background: #0b0e12; border-radius: 8px; margin-top: 4px; }
+  #atributos { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  #atributos th { color: var(--suave); font-weight: 500; text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--borda); }
+  #atributos th:first-child, #atributos td:first-child { text-align: left; }
+  #atributos td { text-align: right; padding: 3px 6px; border-bottom: 1px solid #1d222b; }
+  #atributos td.sobe { color: var(--laranja); }
+  #atributos td.desce { color: var(--azul); }
+  .grupo td { color: var(--suave); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding-top: 10px !important; }
 </style>
 </head>
 <body>
@@ -74,7 +93,7 @@
       <div id="cam_vazia">esperando a câmera…</div>
       <div class="sobre topo">
         <div class="etiqueta" id="cam_estado">…</div>
-        <div class="etiqueta" id="cam_legenda">olhos: <b style="color:#5ac85a">verde</b> aberto · <b style="color:#e64a3c">vermelho</b> fechado<br>boca: <b style="color:#f0b428">âmbar</b> durante bocejo</div>
+        <div class="etiqueta" id="cam_legenda"></div>
       </div>
       <div class="sobre base">
         <div class="etiqueta"><div class="rotulo" style="color:#d7dde5">olho fechado há</div><div id="cam_contador">0,0 s</div></div>
@@ -85,6 +104,23 @@
       <button id="falso" title="tecla F">Foi alarme falso (F)</button>
       <button id="recal" title="tecla R">Recalibrar (R)</button>
       <button id="grande" title="tecla C">Câmera em tela cheia (C)</button>
+      <button id="pontos" title="tecla P">Pontos: contornos (P)</button>
+    </div>
+
+    <div id="entradas" class="cartao">
+      <div class="rotulo">Entradas da MIL</div>
+      <div class="nota">A rede lê 4 sinais quadro a quadro (GRU, 10 por segundo) e 16 atributos de cada minuto,
+        sempre como diferença para o seu 1º minuto (a linha tracejada). Abaixo, o último minuto.</div>
+      <div class="sinais">
+        <div class="sinal"><div class="topo_sinal"><span>P(olho fechado), do YOLO</span><b id="v_s0">–</b></div><canvas id="s0"></canvas></div>
+        <div class="sinal"><div class="topo_sinal"><span>EAR (abertura do olho)</span><b id="v_s1">–</b></div><canvas id="s1"></canvas></div>
+        <div class="sinal"><div class="topo_sinal"><span>abertura da boca</span><b id="v_s2">–</b></div><canvas id="s2"></canvas></div>
+        <div class="sinal"><div class="topo_sinal"><span>rosto visível</span><b id="v_s3">–</b></div><canvas id="s3"></canvas></div>
+      </div>
+      <table id="atributos">
+        <thead><tr><th>atributo do minuto</th><th>1º minuto</th><th>último minuto</th><th>diferença</th></tr></thead>
+        <tbody id="t_atributos"><tr><td colspan="4" class="nota">aparece depois da calibração (1º minuto)</td></tr></tbody>
+      </table>
     </div>
   </section>
 
@@ -122,10 +158,13 @@
         <div class="nota" id="n_perclos">fração do minuto com olho fechado · sem treino</div>
       </div>
       <div class="cartao">
-        <div class="rotulo">Sonolência pela rede MIL</div>
+        <div class="rotulo">Sonolência pela rede MIL (minutos desde a calibração)</div>
         <div class="valor" id="mil">–</div>
         <div class="barra"><i id="b_mil"></i><span class="marca" style="left:50%"></span></div>
         <div class="nota" id="n_mil">deep learning · compara com o seu 1º minuto</div>
+        <div class="nota" id="mil_ultimo"></div>
+        <div id="pesos" title="peso da atenção de cada minuto no saco"></div>
+        <div class="nota" id="n_pesos"></div>
       </div>
     </div>
     <div class="cartao" style="margin-top:18px">
@@ -182,11 +221,95 @@ const telaCheia = () => {
   else $("camera").requestFullscreen?.().catch(() => {});
 };
 $("grande").onclick = telaCheia;
+$("pontos").onclick = () => acao("pontos");
 document.addEventListener("keydown", e => {
   if (e.key === "f" || e.key === "F") acao("falso");
   if (e.key === "r" || e.key === "R") acao("recalibrar");
   if (e.key === "c" || e.key === "C") telaCheia();
+  if (e.key === "p" || e.key === "P") acao("pontos");
 });
+
+// ---------------------------------------------------------------- o que aparece por cima do vídeo (tecla P)
+const NOMES_MODO = { "contornos": "contornos", "entradas": "entradas da MIL", "limpo": "vídeo limpo" };
+const LEGENDAS = {
+  "contornos": 'olhos: <b style="color:#5ac85a">verde</b> aberto · <b style="color:#e64a3c">vermelho</b> fechado<br>boca: <b style="color:#f0b428">âmbar</b> durante bocejo',
+  "entradas": '<b style="color:#3cc8e6">quadrados</b>: recortes que vão para o YOLO<br>' +
+              'olhos: 6 pontos do EAR (<b style="color:#5ac85a">verde</b> aberto · <b style="color:#e64a3c">vermelho</b> fechado)<br>' +
+              'boca: 8 pontos da abertura (<b style="color:#f0b428">âmbar</b> no bocejo)<br>' +
+              '<span style="color:#aaa">pontos cinza</span>: malha do MediaPipe (pose e expressões)',
+  "limpo": "",
+};
+let modoAtual = null;
+function mostrarModo(m) {
+  if (!m || m === modoAtual) return;
+  modoAtual = m;
+  $("pontos").textContent = `Pontos: ${NOMES_MODO[m]} (P)`;
+  $("cam_legenda").innerHTML = LEGENDAS[m];
+  $("cam_legenda").hidden = !LEGENDAS[m];
+}
+
+// ---------------------------------------------------------------- entradas da MIL
+const fmt = (x, casas) => x == null ? "–" : x.toFixed(casas).replace(".", ",");
+function grafico(id, serie, opc) {
+  const cv = $(id), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth * dpr, H = cv.clientHeight * dpr;
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext("2d");
+  g.clearRect(0, 0, W, H);
+  const vals = serie.filter(v => v != null);
+  if (!vals.length) return;
+  let lo = opc.min, hi = opc.max;
+  if (lo == null || hi == null) {             // escala automática, incluindo a referência
+    const extra = [...vals, ...(opc.ref != null ? [opc.ref] : [])];
+    lo = Math.min(...extra); hi = Math.max(...extra);
+    const folga = Math.max((hi - lo) * 0.15, 0.01); lo -= folga; hi += folga;
+  }
+  const y = v => H - 3 * dpr - (v - lo) / (hi - lo) * (H - 6 * dpr);
+  const x = i => serie.length < 2 ? 0 : i / (serie.length - 1) * W;
+  const linhaH = (v, cor, tracejado) => {
+    g.save(); g.strokeStyle = cor; g.lineWidth = 1 * dpr; if (tracejado) g.setLineDash([5 * dpr, 4 * dpr]);
+    g.beginPath(); g.moveTo(0, y(v)); g.lineTo(W, y(v)); g.stroke(); g.restore();
+  };
+  if (opc.limiar != null) linhaH(opc.limiar, "#e5484d88", false);
+  if (opc.ref != null) linhaH(opc.ref, "#f2c14e", true);
+  g.strokeStyle = opc.cor; g.lineWidth = 1.6 * dpr; g.beginPath();
+  let aberto = false;
+  serie.forEach((v, i) => {
+    if (v == null) { aberto = false; return; }
+    if (!aberto) { g.moveTo(x(i), y(v)); aberto = true; } else g.lineTo(x(i), y(v));
+  });
+  g.stroke();
+}
+const FMT_ATRIB = n => n === "PERCLOS" ? v => fmt(v * 100, 1) + "%"
+  : ["piscadas", "fechamentos de 1 s+", "bocejos"].includes(n) ? v => fmt(v, 0)
+  : n.startsWith("duração") ? v => fmt(v, 2) + " s"
+  : n.startsWith("desvio") ? v => fmt(v, 1) + "°"
+  : v => fmt(v, 3);
+const GRUPOS = { "PERCLOS": "olhos", "desvio do pitch": "cabeça (pose)", "eyeBlink médio": "expressões do MediaPipe (blendshapes)" };
+function desenharEntradas(e) {
+  const en = e.entradas;
+  if (!en) return;
+  const s = en.series || [], ref = en.referencia;
+  const col = k => s.map(l => l[k]);
+  const ult = k => { for (let i = s.length - 1; i >= 0; i--) if (s[i][k] != null) return s[i][k]; return null; };
+  grafico("s0", col(0), { min: 0, max: 1, cor: "#4c8dff", limiar: e.limiar_olho, ref: ref && ref[0] });
+  grafico("s1", col(1), { cor: "#2fbf71", ref: ref && ref[1] });
+  grafico("s2", col(2), { cor: "#f2c14e", ref: ref && ref[2] });
+  grafico("s3", col(3), { min: -0.05, max: 1.05, cor: "#8b95a3" });
+  $("v_s0").textContent = ult(0) == null ? "–" : fmt(ult(0) * 100, 0) + "%";
+  $("v_s1").textContent = fmt(ult(1), 3);
+  $("v_s2").textContent = fmt(ult(2), 2);
+  $("v_s3").textContent = ult(3) == null ? "–" : (ult(3) >= 0.5 ? "sim" : "não");
+  if (!en.calibracao) return;
+  $("t_atributos").innerHTML = en.atributos.map((n, i) => {
+    const f = FMT_ATRIB(n), c = en.calibracao[i], u = en.ultimo ? en.ultimo[i] : null;
+    const d = (c == null || u == null) ? null : u - c;
+    const classe = d == null || Math.abs(d) < 1e-9 ? "" : d > 0 ? "sobe" : "desce";
+    const dTxt = d == null ? (en.ultimo ? "–" : "aguardando") : (d > 0 ? "+" : d < 0 ? "−" : "") + f(Math.abs(d));
+    const grupo = GRUPOS[n] ? `<tr class="grupo"><td colspan="4">${GRUPOS[n]}</td></tr>` : "";
+    return `${grupo}<tr><td>${n}</td><td>${f(c)}</td><td>${en.ultimo ? f(u) : "–"}</td><td class="${classe}">${dTxt}</td></tr>`;
+  }).join("");
+}
 
 // ---------------------------------------------------------------- câmera: um quadro por vez (funciona em qualquer navegador)
 let urlQuadro = null;
@@ -254,6 +377,20 @@ function desenhar(e) {
     largura($("b_mil"), e.p_mil);
     $("b_mil").style.background = e.p_mil >= e.limiar_mil ? cor("atencao") : cor("normal");
   }
+  // o saco "lembra" o minuto mais sonolento; o último minuto sozinho e a atenção mostram de onde vem a P
+  const pesos = e.pesos_mil || [];
+  if (e.p_mil == null || !pesos.length) {
+    $("mil_ultimo").textContent = ""; $("pesos").innerHTML = ""; $("n_pesos").textContent = "";
+  } else {
+    $("mil_ultimo").textContent = `último minuto sozinho: ${pct(e.p_mil_ultimo)}`;
+    const maior = pesos.indexOf(Math.max(...pesos)), topo = Math.max(...pesos);
+    $("pesos").innerHTML = pesos.map((w, i) =>
+      `<div class="col${i === maior && pesos.length > 1 ? " maior" : ""}" title="minuto ${e.minuto_ini_saco + i}: peso ${fmt(w, 2)}">` +
+      `<i style="height:${Math.max(4, w / topo * 100) * 0.7}%"></i><span>${e.minuto_ini_saco + i}</span></div>`).join("");
+    $("n_pesos").textContent = pesos.length > 1
+      ? `atenção por minuto do saco: o minuto ${e.minuto_ini_saco + maior} pesa mais (${fmt(pesos[maior] * 100, 0)}%)`
+      : "atenção: um minuto só no saco";
+  }
 
   const ev = e.eventos || [];
   $("eventos").innerHTML = ev.length ? ev.map(x =>
@@ -262,6 +399,8 @@ function desenhar(e) {
 
   $("tecnico").textContent = e.fps ? `${e.fps.toFixed(0)} quadros/s · ${e.ms.toFixed(0)} ms por quadro` : "conectando…";
   if (!e.video) $("camera").hidden = true;
+  mostrarModo(e.modo_pontos);
+  desenharEntradas(e);
 
   // sons novos (na primeira leitura, só marca o ponto de partida)
   for (const s of e.sons || []) {
