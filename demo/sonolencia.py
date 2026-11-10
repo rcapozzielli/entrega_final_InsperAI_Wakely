@@ -30,6 +30,7 @@ Uso:
 """
 import math
 import os
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -58,12 +59,16 @@ def abertura_boca(p):
     return v / np.linalg.norm(p[BOCA_H[0]] - p[BOCA_H[1]])
 
 
-def recortar_olho(cinza, contorno, fator=1.4):
-    from PIL import Image
+def caixa_olho(contorno, fator=1.4):
+    """Quadrado (x0, y0, x1, y1) em volta do contorno do olho: a região que vai para o YOLO."""
     cx, cy = contorno.mean(axis=0)
     lado = fator * (contorno[:, 0].max() - contorno[:, 0].min())
-    caixa = (int(cx - lado / 2), int(cy - lado / 2), int(cx + lado / 2), int(cy + lado / 2))
-    return np.asarray(Image.fromarray(cinza).crop(caixa).resize((TAM, TAM), Image.BILINEAR))
+    return (int(cx - lado / 2), int(cy - lado / 2), int(cx + lado / 2), int(cy + lado / 2))
+
+
+def recortar_olho(cinza, contorno, fator=1.4):
+    from PIL import Image
+    return np.asarray(Image.fromarray(cinza).crop(caixa_olho(contorno, fator)).resize((TAM, TAM), Image.BILINEAR))
 
 
 def angulos(matriz):
@@ -260,14 +265,20 @@ class ModeloMIL:
         self.mediana_a = self.cfg["mediana_atrib"].numpy()
         self.media_a, self.escala_a = self.cfg["media_atrib"].numpy(), self.cfg["escala_atrib"].numpy()
 
-    def entradas(self, calibracao, minutos):
-        """calibracao: [600, 61]; minutos: [m, 600, 61] -> tensores normalizados pelo 1º minuto e padronizados."""
-        x_cal, x = canais_4(calibracao[None])[0], canais_4(np.asarray(minutos))
+    @staticmethod
+    def referencia(calibracao):
+        """Mediana de P(fechado), EAR e boca no 1º minuto (com rosto); o 4º canal (rosto) não é deslocado."""
+        x_cal = canais_4(calibracao[None])[0]
         rosto = x_cal[:, 3] == 1
         med = np.zeros(4, np.float32)
         if rosto.any():
             med[:3] = [np.nanmedian(x_cal[rosto, c]) if not np.isnan(x_cal[rosto, c]).all() else 0.0
                        for c in range(3)]
+        return med
+
+    def entradas(self, calibracao, minutos):
+        """calibracao: [600, 61]; minutos: [m, 600, 61] -> tensores normalizados pelo 1º minuto e padronizados."""
+        x, med = canais_4(np.asarray(minutos)), self.referencia(calibracao)
         x = x - np.nan_to_num(med)
         z = np.nan_to_num((x[:, :, :self.c] - self.media_c) / self.desvio_c, nan=0.0).astype(np.float32)
         a_cal = atributos_minuto(calibracao, self.cfg)
@@ -304,6 +315,8 @@ class MonitorSonolencia:
         self.amostras, self.minutos = [], []             # minuto atual e minutos completos (o 1º é a calibração)
         self.ultimas = []                                # últimas 600 amostras, para o PERCLOS deslizante
         self.p_mil, self.pesos = None, None
+        self.ref_canais = None                           # mediana do 1º minuto (P(fechado), EAR, boca), para o painel
+        self.atrib_cal = self.atrib_ultimo = None        # 16 atributos do 1º minuto e do último minuto completo
 
     def _sem_rosto(self):
         s = np.full(len(self.cfg["canais_rico"]), np.nan, np.float32)
@@ -327,6 +340,12 @@ class MonitorSonolencia:
         if len(self.amostras) == self.n:
             self.minutos.append(np.stack(self.amostras))
             self.amostras = []
+            # só para mostrar no painel; a MIL refaz essas contas em ModeloMIL.entradas
+            if len(self.minutos) == 1:
+                self.ref_canais = ModeloMIL.referencia(self.minutos[0])
+                self.atrib_cal = atributos_minuto(self.minutos[0], self.cfg)
+            else:
+                self.atrib_ultimo = atributos_minuto(self.minutos[-1], self.cfg)
             if len(self.minutos) >= 2:
                 saco = np.stack(self.minutos[1:][-self.max_minutos:])
                 self.p_mil, self.pesos = self.mil.prever(self.minutos[0], saco)
@@ -351,3 +370,17 @@ class MonitorSonolencia:
                 "p_mil": self.p_mil,
                 "sonolento_mil": None if self.p_mil is None else self.p_mil >= self.cfg["limiar_mil"],
                 "pesos_atencao": self.pesos}
+
+    def entradas_ao_vivo(self, pontos=120):
+        """O que a MIL recebe, para o painel: os 4 canais por quadro do último minuto (reduzidos a `pontos`
+        médias), a referência do 1º minuto e os 16 atributos do 1º e do último minuto completo."""
+        series = None
+        if self.ultimas:
+            x = canais_4(np.stack(self.ultimas)[None])[0]              # [<=600, 4]
+            blocos = np.array_split(x, min(pontos, len(x)))
+            with np.errstate(all="ignore"), warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)          # bloco sem rosto: média vazia
+                series = np.stack([np.nanmean(b, axis=0) for b in blocos])  # [pontos, 4], NaN sem rosto
+        return {"series": series, "segundos": len(self.ultimas) / self.cfg["fps"],
+                "referencia": self.ref_canais, "atributos": list(self.cfg["atributos"]),
+                "atrib_calibracao": self.atrib_cal, "atrib_ultimo": self.atrib_ultimo}

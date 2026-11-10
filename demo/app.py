@@ -5,7 +5,8 @@ Uso (na raiz do repositório):
     uv run python demo/app.py --camera 1         # outra câmera (por exemplo, o celular como webcam)
     uv run python demo/app.py --video arquivo.mp4 --log demo/eventos.csv
 
-O painel fica em http://localhost:8765. Teclas no painel: F = "foi alarme falso" (só registra), R = recalibrar.
+O painel fica em http://localhost:8765. Teclas no painel: F = "foi alarme falso" (só registra), R = recalibrar,
+P = o que aparece por cima do vídeo (contornos, entradas da MIL ou vídeo limpo), C = câmera em tela cheia.
 
 Nada é gravado além dos eventos (horário e tipo), e só se --log for passado. O vídeo não é salvo.
 O Wakely é um protótipo acadêmico: nunca usar dirigindo.
@@ -26,7 +27,12 @@ import numpy as np
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
 from alerta import LIMIAR_OLHO, MaquinaEstados  # noqa: E402
-from sonolencia import CONTORNO_D, CONTORNO_E, ExtratorRosto, MonitorSonolencia  # noqa: E402
+from sonolencia import (BOCA_H, BOCA_V, CONTORNO_D, CONTORNO_E, EAR_D, EAR_E,  # noqa: E402
+                        ExtratorRosto, MonitorSonolencia, caixa_olho)
+
+# o que aparece por cima do vídeo; a tecla P passa para o próximo
+MODOS_PONTOS = ["contornos", "entradas", "limpo"]
+BOCA_CONTORNO = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185]
 
 
 def num(x):
@@ -38,6 +44,13 @@ def num(x):
     except (TypeError, ValueError):
         return None
     return None if np.isnan(x) else x
+
+
+def lista(a, casas=4):
+    """array numpy (com NaN) -> lista JSON, com None no lugar de NaN."""
+    if a is None:
+        return None
+    return [lista(v, casas) if np.ndim(v) else (None if num(v) is None else round(float(v), casas)) for v in a]
 
 
 class Demo:
@@ -61,6 +74,7 @@ class Demo:
                 self.csv.writerow(["hora", "t_s", "tipo", "detalhe"])
         self.rodando = True
         self.pedido_recalibrar = False
+        self.modo_pontos = MODOS_PONTOS.index(args.pontos)
 
     # ------------------------------------------------------------------ ações do painel
     def registrar(self, t, tipo, detalhe):
@@ -76,6 +90,9 @@ class Demo:
                 self.maquina.eventos.append((t, "marcado como falso", "tecla F"))
             elif tipo == "recalibrar":
                 self.pedido_recalibrar = True     # o laço da câmera reinicia no próximo quadro
+            elif tipo == "pontos":
+                self.modo_pontos = (self.modo_pontos + 1) % len(MODOS_PONTOS)
+                self.estado["modo_pontos"] = MODOS_PONTOS[self.modo_pontos]
 
     # ------------------------------------------------------------------ laço da câmera
     def abrir(self):
@@ -89,23 +106,52 @@ class Demo:
         return cap, None
 
     def desenhar(self, bgr, est):
-        """Quadro para o painel: espelhado (como um espelho), contornos dos olhos e da boca. Não é gravado."""
-        img = cv2.flip(bgr, 1) if (self.args.espelhar and not self.args.video) else bgr.copy()
+        """Quadro para o painel, já na largura do painel (vídeos pequenos, como os de 224 px do UTA, são ampliados
+        para o desenho ficar legível). Webcam espelhada, como um espelho. Não é gravado.
+
+        Modos (tecla P): "contornos" (olhos e boca), "entradas" (o que vira entrada da MIL) e "limpo" (só o vídeo)."""
+        h, w = bgr.shape[:2]
+        escala = self.args.largura_video / w
+        img = cv2.resize(bgr, (self.args.largura_video, round(h * escala)),
+                         interpolation=cv2.INTER_AREA if escala < 1 else cv2.INTER_LINEAR)
+        espelhar = self.args.espelhar and not self.args.video
+        if espelhar:
+            img = cv2.flip(img, 1)
+        modo = MODOS_PONTOS[self.modo_pontos]
         p = self.extrator.pontos
-        if p is not None:
-            if self.args.espelhar and not self.args.video:
-                p = p.copy(); p[:, 0] = img.shape[1] - p[:, 0]
-            espessura = max(2, img.shape[1] // 400)
+        if p is not None and modo != "limpo":
+            p = p * escala
+            if espelhar:
+                p[:, 0] = img.shape[1] - p[:, 0]
+            pi = lambda idx: p[idx].astype(np.int32)                                  # noqa: E731
+            pt = lambda i: (int(p[i, 0]), int(p[i, 1]))                               # noqa: E731
             cor = (60, 60, 230) if est.get("fechado") else (90, 200, 90)          # BGR: vermelho fechado, verde aberto
-            for contorno in (CONTORNO_E, CONTORNO_D):
-                cv2.polylines(img, [p[contorno].astype(np.int32).reshape(-1, 1, 2)], True, cor, espessura)
-            boca = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185]
             cor_boca = (40, 180, 240) if est.get("bocejo") else (200, 200, 200)  # âmbar durante bocejo
-            cv2.polylines(img, [p[boca].astype(np.int32).reshape(-1, 1, 2)], True, cor_boca, max(1, espessura - 1))
-        h, w = img.shape[:2]
-        largura = self.args.largura_video
-        if w > largura:
-            img = cv2.resize(img, (largura, int(h * largura / w)))
+            if modo == "contornos":
+                for contorno in (CONTORNO_E, CONTORNO_D):
+                    cv2.polylines(img, [pi(contorno).reshape(-1, 1, 2)], True, cor, 2)
+                cv2.polylines(img, [pi(BOCA_CONTORNO).reshape(-1, 1, 2)], True, cor_boca, 2)
+            else:
+                # malha inteira, clarinha: a pose da cabeça e as 7 expressões usadas pela MIL vêm do rosto todo
+                for x, y in p[:468].astype(np.int32):
+                    cv2.circle(img, (int(x), int(y)), 1, (150, 150, 150), -1, cv2.LINE_AA)
+                # recorte de cada olho que vai para o YOLO -> P(olho fechado)
+                for contorno in (CONTORNO_E, CONTORNO_D):
+                    x0, y0, x1, y1 = caixa_olho(p[contorno])
+                    cv2.rectangle(img, (x0, y0), (x1, y1), (230, 200, 60), 1, cv2.LINE_AA)
+                cv2.putText(img, "YOLO", (x0, y0 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (230, 200, 60), 1, cv2.LINE_AA)
+                # EAR: 6 pontos por olho, duas alturas sobre a largura
+                for idx in (EAR_E, EAR_D):
+                    for a, b in ((0, 3), (1, 5), (2, 4)):
+                        cv2.line(img, pt(idx[a]), pt(idx[b]), cor, 1, cv2.LINE_AA)
+                    for i in idx:
+                        cv2.circle(img, pt(i), 3, cor, -1, cv2.LINE_AA)
+                # abertura da boca: 3 alturas sobre a largura
+                cv2.line(img, pt(BOCA_H[0]), pt(BOCA_H[1]), cor_boca, 1, cv2.LINE_AA)
+                for a, b in BOCA_V:
+                    cv2.line(img, pt(a), pt(b), cor_boca, 1, cv2.LINE_AA)
+                for i in [*BOCA_H, *[k for par in BOCA_V for k in par]]:
+                    cv2.circle(img, pt(i), 3, cor_boca, -1, cv2.LINE_AA)
         ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 75])
         return jpg.tobytes() if ok else None
 
@@ -162,6 +208,7 @@ class Demo:
                 for ev in self.maquina.eventos[self.eventos_vistos:]:
                     self.registrar(*ev)
                 self.eventos_vistos = len(self.maquina.eventos)
+                ent = self.monitor.entradas_ao_vivo()
                 self.estado = {
                     "iniciado": True, "t": t, "nivel": est["nivel"], "texto": est["texto"],
                     "rosto": rosto, "p_fech": p_fech, "limiar_olho": LIMIAR_OLHO, "boca": boca,
@@ -174,6 +221,10 @@ class Demo:
                     "fps": num(fps_ema), "ms": num(ms_ema),
                     "eventos": [{"t": round(a, 1), "tipo": b, "detalhe": c} for a, b, c in self.maquina.eventos[-8:]][::-1],
                     "sons": self.sons, "video": not self.args.sem_video,
+                    "modo_pontos": MODOS_PONTOS[self.modo_pontos],
+                    "entradas": {"series": lista(ent["series"]), "segundos": ent["segundos"],
+                                 "referencia": lista(ent["referencia"]), "atributos": ent["atributos"],
+                                 "calibracao": lista(ent["atrib_calibracao"]), "ultimo": lista(ent["atrib_ultimo"])},
                 }
             if not self.args.sem_video:
                 jpg = self.desenhar(bgr, est)
@@ -245,6 +296,8 @@ def main():
     ap.add_argument("--sem-video", action="store_true", help="não mostrar a imagem da câmera no painel")
     ap.add_argument("--largura-video", type=int, default=960, help="largura da imagem mostrada no painel (px)")
     ap.add_argument("--nao-espelhar", action="store_true", help="não espelhar a imagem da webcam no painel")
+    ap.add_argument("--pontos", choices=MODOS_PONTOS, default="contornos",
+                    help="o que desenhar por cima do vídeo ao abrir (a tecla P troca no painel)")
     ap.add_argument("--sem-navegador", action="store_true", help="não abrir o navegador sozinho")
     args = ap.parse_args()
     args.espelhar = not args.nao_espelhar
