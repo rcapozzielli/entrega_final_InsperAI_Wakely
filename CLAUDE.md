@@ -50,6 +50,7 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 | 7 | Agente de RL no alerta: Q-learning com tabela, curva por λ, tecla "foi alarme falso" e mapa da política |
 | 8 | Modelo temporal no UTA-RLDD: extração (8.1), análise inicial e falsos alarmes (8.2), PERCLOS e logística (8.3), GRU e TCN (8.4), cabeça, expressões e transformer (8.5), análise de erros (8.6), MIL com normalização pelo 1º minuto e validação externa no DROZY (8.7) |
 | 9 | Resumo e próximos passos |
+| 10 | Feedback da entrega intermediária (12/11) e plano de ação até 17/11, só texto. A lista de bases buscadas está em `docs/bases_candidatas.md` |
 
 Funções principais: `fechamento`, `bocejo_ativo`, `alertas` e `avaliar_eventos` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2), `rodar_agente`, `rodar_regra` e `treinar_agente` (seção 7), `extrair_pessoa`, `atributos`, `avisos_regra`, `metricas_8` e `prever_temporal` (seção 8), `extrair_pessoa_rico`, `carregar_rico`, `treinar_85`, `prever_85` e `auc_dentro_da_pessoa` (seções 8.5 e 8.6), `normalizar_videos`, `MILSono`, `treinar_87`, `prever_87`, `extrair_drozy` e `prever_b` (seção 8.7). A última célula da seção 8.7 grava os pesos da MIL para a demo.
 
