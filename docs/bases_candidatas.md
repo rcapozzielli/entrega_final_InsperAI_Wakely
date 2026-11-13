@@ -8,7 +8,7 @@ Resultado da frente A do plano pós-entrega intermediária. Cinco buscas em para
 
 **Fora do FL3D, do NITYMED e do DMD, não achamos nenhuma base pública com microssono espontâneo marcado no tempo.** Nenhuma das 5 buscas encontrou uma. Os trabalhos de vários países (incluindo Brasil, México, Chile, Irã e Malásia) usam NTHU-DDD, UTA-RLDD ou DROZY, ou gravam dados próprios que não publicam. O SHRP2 (EUA) tem microssono em direção real, mas o vídeo do rosto só pode ser usado num enclave físico na Virginia. Essa lacuna é da área, não do projeto, e entra no paper.
 
-Segundo o arXiv 2511.19519 (Wolter et al., 2025), a parte de sonolência do **DMD** tem piscadas e olho fechado/microssono por frame, com algumas inconsistências nos rótulos. É a base de microssono mais viável para nós.
+A parte de sonolência do **DMD** tem olho fechado, piscada e bocejo por frame, mas o guia da base (recebido em 13/11) diz que os estados foram **encenados**, com o carro parado e sem sono real. Como a **BINUS** já tem 93 fechamentos de 1 s ou mais em vídeo (ver abaixo), o DMD não foi baixado e fica só como citação.
 
 ## Por uso
 
@@ -16,7 +16,7 @@ Segundo o arXiv 2511.19519 (Wolter et al., 2025), a parte de sonolência do **DM
 
 | Base | País | O que tem | Acesso | Conferido |
 | --- | --- | --- | --- | --- |
-| **DMD** (parte de sonolência) | Espanha | Piscada e olho fechado por frame, RGB na versão pública | Já conhecida; confirmar o acesso | Parcial (via arXiv 2511.19519) |
+| **DMD** (parte de sonolência) | Espanha | Olho fechado, piscada e bocejo por frame, RGB na versão pública; **estados encenados**, carro parado | Formulário (acesso recebido em 13/11), CC BY-NC-ND 4.0 | Sim (guia da base). Descartada: encenada, e a BINUS cobre o papel |
 | **FatigueView** (2022) | China | RGB e IR, 5 câmeras, piscada, bocejo e sonolência no tempo, 1.000+ h | Baidu Pan; licença dos dados incerta; parte das anotações após aprovação | Parcial. Um survey diz que a cena é simulada (cadeira de escritório) |
 | **BINUS Raspberry Pi 5** (2025) | Indonésia | 32 pessoas, olho aberto/fechado e bocejo em imagens e vídeo, RGB com LED IR, óculos, boné e hijab | **Livre, CC BY 4.0** (Mendeley) | Sim |
 
@@ -27,8 +27,8 @@ Segundo o arXiv 2511.19519 (Wolter et al., 2025), a parte de sonolência do **DM
 | **UL-DD** (2025) | EUA e Finlândia | 19 pessoas, sessão alerta e sonolenta de 40 min, KSS a cada 4 min, rosto em IR e profundidade a 60 fps | Zenodo restrito: e-mail institucional e acordo de uso; 14,7 TB no total (cerca de 35 GB de IR por pessoa) | Sim |
 | **WACHsens** (2021–22) | Áustria (TU Graz) | Simulador, mesma pessoa descansada e cansada, 196 testes de 50 motoristas avaliados por especialista no tempo (alerta, moderado, extremo e dormindo/microssono). **Sem vídeo do rosto:** os dados são sinais em CSV, com abertura da pálpebra do SmartEye a 100 Hz, posição da cabeça, olhar, EEG e EOG | TRYOUT (3,5 GB) aberto, mas sob contrato de transferência só para pesquisa; FULL (880 GB) e SMALL por e-mail | Sim (documentação lida) |
 | **UNC Drowsy Driving** (2018) | EUA | Cerca de 10 pessoas, simulador, KSS a cada 5 min (segundo o artigo) | Formulário | Sim (página) |
-| **MFD** | China | 19 pessoas, 2 sessões de 2 h, RGB-D do rosto e EEG, fadiga pelo PERCLOS | IEEE DataPort, exige assinatura | Sim. Rótulo pelo PERCLOS é circular para nós |
-| **SUST-DDD** (2022) | Turquia | 19 pessoas, 2.074 clipes de 10 s, direção real com celular, rótulo de observador | Kaggle (página não abriu) ou pedido aos autores | Parcial |
+| **MFD** | China | 19 pessoas, 2 sessões de 2 h, RGB-D do rosto e EEG, fadiga pelo PERCLOS | IEEE DataPort, exige assinatura paga (conferido em 13/11 com conta logada) | Sim. **Descartada:** paga, e o rótulo pelo PERCLOS impede testar se uma rede supera o PERCLOS |
+| **SUST-DDD** (2022) | Turquia | 19 pessoas, 2.074 clipes de 10 s, direção real com celular, rótulo de observador | **Baixada** pelo Kaggle (licença "Unknown") | Sim |
 | **DriverMVT** (2022) | Rússia | 9 motoristas, sonolência e pose da cabeça, números inconsistentes no artigo | Link de download não achado | Parcial |
 
 ### Piscadas (falsos alarmes)
@@ -61,6 +61,7 @@ Segundo o arXiv 2511.19519 (Wolter et al., 2025), a parte de sonolência do **DM
 | **UnityEyes** (2016) | Reino Unido | Gerador de imagens da região do olho com pálpebra animada; falta saber se fecha totalmente | Download livre | Sim |
 | **Gerador "Blinking Beyond EAR"** (2025) | Alemanha e Austrália | Avatar no Blender com piscadas sorteadas; propõe um ângulo da pálpebra mais estável que o EAR | Ainda não liberado | Sim (artigo) |
 | VigiDriver | não informado | É o UTA-RLDD com brilho, reflexo e ruído sintéticos, não uma base nova | IEEE DataPort, assinatura | Parcial |
+| FatigueFace-1156 (2026) | não informado | 1.156 imagens em 8 classes (olho fechado, bocejo, pose), todas geradas a partir de **uma única foto de uma pessoa** | IEEE DataPort, assinatura | Sim. Descartada: um rosto só |
 
 ## Só para citar no paper
 
@@ -77,7 +78,8 @@ Todas em `data/bases_novas/` (fora do Git), cada uma na sua pasta. Os zips foram
 | --- | --- | --- | --- |
 | Eyeblink8 | `eyeblink8/eyeblink8.zip` (8 vídeos com anotação de piscada) | 313 MB | Quantas piscadas a regra de 1 s transforma em alarme (a seção 6.2 só estimou isso) |
 | RT-BENE | `rt_bene/`: só as 4 pessoas da dobra de validação dos autores (s000, s011, s015, s016), com etiquetas e `rt_bene_subjects.csv` | 266 MB | Teste do classificador de olho em RGB (frente J). A s006 foi descartada pelos autores |
-| BINUS Raspberry Pi 5 | `binus_rpi5/binus_rpi5.zip` (`modelling` em imagens e `other_testing` em vídeo) | 1,22 GB | P(fechado) e filtro de bocejo fora do FL3D |
+| BINUS Raspberry Pi 5 | `binus_rpi5/binus_rpi5.zip` (`modelling` em imagens e `other_testing` em vídeo) | 1,22 GB | Microssono fora do FL3D: nos 47 vídeos de teste (46,8 min, anotação a cada 5 frames, ou 6 por segundo), há 93 fechamentos de 1 s ou mais, 25 deles durante bocejo, e 3 de 3 s ou mais (o maior com 3,2 s). Também testa o filtro de bocejo. Os vídeos não identificam a pessoa, o que não importa para teste |
+| SUST-DDD | `SUST-DDD/SUST Driver Drowsiness Dataset/` (`drowsiness/d_N.mp4` e `not drowsiness/n_N.mp4`; o zip foi apagado depois de conferido) | 4,77 GB | Sonolência em direção real, só teste. Vídeo vertical 720×1280 a 25 ou 30 fps. Um arquivo tem o nome errado (`n_790mp4.mp4`). Checagem de continuidade em `data/cache/sust/continuidade.csv`: cerca de 70% das junções entre clipes de número seguido são contínuas, o que dá 87 sequências de 1 min ou mais (42 sonolentas e 45 não sonolentas, até 10 min). Conferido a olho em 6 junções: as contínuas são o mesmo vídeo, e as quebras podem ser outro vídeo da mesma pessoa ou outra pessoa |
 | Drive&Act | `driveandact/a_column_driver.zip` (câmera NIR da coluna A do motorista) e `iccv_activities_3s.zip` (anotações) | 2,68 GB | Regra de olhar para baixo (frente E) |
 | WACHsens | `wachsens/Documentation.zip` (11 PDFs) e o contrato de transferência não comercial | 52 MB | Decidir se vale baixar o TRYOUT |
 
@@ -92,9 +94,10 @@ Estas três ficam para o Colab, se forem usadas.
 
 **Já baixadas:** ver a tabela acima. Nenhuma é usada para treinar ou escolher limiar sem protocolo escrito antes.
 
-**Ainda a decidir:**
-- **WACHsens TRYOUT:** daria para testar PERCLOS e MIL com a pálpebra do SmartEye, na mesma pessoa e com rótulo no tempo (exploratório, porque o sinal de entrada é outro). Exige aceitar o contrato.
-- **DMD:** confirmar o acesso e os rótulos de microssono.
+**Em andamento (13/11):**
+- **WACHsens TRYOUT:** contrato aceito. O download direto falha porque o servidor corta a conexão (o melhor chegou a 427 MB de 3,5 GB) e não aceita retomar. Vai ser baixado pelo Colab.
+- **UL-DD:** acesso pedido no Zenodo em 13/11, com o e-mail do Insper. O acesso é pessoal: os dados não podem ser compartilhados nem levados ao Colab.
+- **DMD:** descartado (estados encenados; a BINUS cobre o microssono).
 
 **Pedir acesso já (a resposta pode não chegar a tempo):** UL-DD, WACHsens FULL ou SMALL, DGW, SynDD1, UNC e mEBAL2. Os pedidos precisam sair do e-mail institucional do grupo.
 
