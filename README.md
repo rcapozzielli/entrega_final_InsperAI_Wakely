@@ -14,8 +14,9 @@ A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já r
 | CNN de olho (MobileNetV3-Small, MRL Eye separado por pessoa) | Feita | 97,0% de acurácia em 8 pessoas novas |
 | CNN no vídeo, no lugar do EAR | Feita | Microssono por frame: F1 0,75; com T = 1 s, alerta em 13 de 26 episódios e 6 falsos alarmes |
 | Comparação com a YOLO26n classificadora (5 sementes) | Feita | Acurácia de 97,7% contra 96,8% da MobileNetV3; 84,5% contra 73,5% dos episódios de 1 s ou mais nos 44 vídeos |
-| Filtro de bocejo e teste de piscadas | Feita | YOLO com filtro: 86,8% dos episódios de 1 s ou mais e 10 falsos alarmes nos 44 vídeos, contra 84,5% e 33 sem filtro |
-| Fusão do EAR com o YOLO (seção 6.3) | Feita | Média dos dois, com filtro: 90,7% dos episódios de 1 s ou mais e 6 falsos alarmes nos 44 vídeos; ganha do YOLO em acertos e do EAR em falsos alarmes, com intervalos sem zero |
+| Filtro de bocejo e teste de piscadas | Feita | YOLO com filtro: 86,8% dos episódios de 1 s ou mais e 10 falsos alarmes nos 44 vídeos (F2 0,88), contra 84,5% e 33 sem filtro (F2 0,84) |
+| Fusão do EAR com o YOLO (seção 6.3) | Feita | Média dos dois, com filtro: 90,7% dos episódios de 1 s ou mais e 6 falsos alarmes nos 44 vídeos (F2 0,92); ganha do YOLO em acertos e em F2 e do EAR em falsos alarmes, com intervalos sem zero |
+| Precisão por alarme, F1 e F2 (protocolo fixado antes) | Feita | Juntam acerto e alarme falso; o F2 pesa mais o recall. Confirmam as conclusões anteriores, e a fusão pela média tem o maior F2. Servem para comparar sinais no FL3D, não para descrever uma viagem |
 | Agente de RL no alerta (Q-learning, piso de 3 s) | Feito | Não supera a regra: com YOLO e λ = 10, 90% dos episódios de 1 s ou mais e 13 falsos alarmes (2 fortes), contra 90% e 10 da regra com piso. Os números do YOLO mudam com a GPU |
 | Falsos alarmes em pessoas acordadas (UTA-RLDD) | Feito | 6,7 alarmes por hora em 9,5 h; 90% das pessoas sem nenhum, e uma pessoa com 40 dos 64 |
 | Modelo temporal (GRU e TCN, UTA-RLDD) | Feito | Não supera o PERCLOS: AUC 0,750 (GRU) e 0,754 (TCN), contra 0,774 do PERCLOS do minuto |
