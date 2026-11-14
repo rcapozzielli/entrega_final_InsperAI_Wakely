@@ -2,8 +2,8 @@
 
 Sistemas (nenhum parâmetro é escolhido aqui; todos vêm do notebook e da demo):
 - "yolo": P(fechado) médio dos dois olhos, limiar 0,4, filtro de bocejo e T = 1 s (demo/alerta.py, seção 7);
-- "fusao": média entre o fechamento pelo EAR (1 - EAR / referência, cortado em [0, 1]; referência = mediana do EAR
-  nos primeiros 30 s com rosto) e o P(fechado) do YOLO, limiar 0,35 (escolhido na calibração do FL3D, seção 6.3),
+- "fusao": média entre o fechamento pelo EAR (1 - EAR / referência, cortado em [0, 1]; referência = percentil 75 do EAR
+  nos primeiros 30 s da sequência, só quadros com rosto, como a `referencia` da seção 2.1 do notebook) e o P(fechado) do YOLO, limiar 0,35 (escolhido na calibração do FL3D, seção 6.3),
   mesmo filtro e mesmo T.
 A regra é a da demo, quadro a quadro, que repete a do notebook (163 de 163 avisos nos 44 vídeos, seção 6).
 """
@@ -29,8 +29,13 @@ def sinais_basicos(s, t):
 
 
 def referencia_ear(t, ear, rosto, segundos=30.0):
-    ok = rosto & (t <= t[rosto][0] + segundos) if rosto.any() else rosto
-    return float(np.nanmedian(ear[ok])) if ok.any() else np.nan
+    """Percentil 75 do EAR nos primeiros 30 s da sequência (só quadros com rosto), como na seção 2.1 do notebook.
+
+    Até 14/11 aqui estava a mediana a partir do primeiro rosto, o que não era a definição do notebook (corrigido em
+    14/11; ver docs/registro_antonio_13-11.md).
+    """
+    ok = rosto & (t < t[0] + segundos) & ~np.isnan(ear)
+    return float(np.percentile(ear[ok], 75)) if ok.any() else np.nan
 
 
 def sinal(sistema, t, s):

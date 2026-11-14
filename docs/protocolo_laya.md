@@ -119,7 +119,7 @@ O Drive&Act saiu dos testes (o MediaPipe achou o rosto em 1% a 28% dos quadros; 
 - **Episódios verdadeiros:** os mesmos dos outros protocolos. Na BINUS, os de `testes_bases_novas.py`; no FL3D, os quadros `microsleep` com buracos de até 0,5 s juntados, como em `construir_janelas.py`. Acerto e falso alarme seguem a frente B (0,5 s de tolerância; falso = alarme longe de qualquer episódio anotado, de qualquer duração).
 - **Laya:** as métricas de cada semente são calculadas separadas, e a média das três é o número do Laya, também dentro de cada sorteio do bootstrap.
 - **Bases da condição 2:** só o Eyeblink8 (o Drive&Act saiu, e o UTA não faz parte deste protocolo). Os falsos alarmes da BINUS são mostrados à parte.
-- **Conferência do código:** a regra atual medida por esta avaliação deu os mesmos números de `testes_bases_novas.py` (BINUS 48 e 44 achados; Eyeblink8 10,6 e 18,2 por hora).
+- **Conferência do código:** a regra atual medida por esta avaliação deu os mesmos números de `testes_bases_novas.py` (BINUS 48 e 44 achados; Eyeblink8 10,6 e 18,2 por hora). Em 14/11, a referência do EAR da fusão foi corrigida para o percentil 75 (ver `docs/protocolo_testes_bases_novas.md`); com isso, a fusão dá 46 achados na BINUS, e os números do Laya não mudam. Os campos `ear_rel_*` do Laya continuam com a mediana, como este protocolo definiu.
 - **Mudança em 14/11, 1h45, antes de qualquer previsão do Laya:** cada semente levou cerca de 2h20 nesta máquina, e o grupo decidiu, por tempo, **ficar só com a semente 0**. As sementes 1 e 2 não foram treinadas. O resultado do Laya é de uma semente só e não mostra a variação entre sementes; isso entra como limitação.
 
 ## Segunda tentativa: Laya com espera de 1 s (escrita em 14/11, antes de rodar)

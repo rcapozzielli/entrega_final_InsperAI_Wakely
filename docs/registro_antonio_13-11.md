@@ -40,16 +40,18 @@ Os "fora de trechos rotulados" do vídeo silencioso caem nos 11 minutos sem rót
 
 Script: `experimentos/testes_bases_novas.py`. Sistemas idênticos aos do notebook (0,4 e 0,35, filtro de bocejo, T = 1 s), sinais do `ExtratorRosto` da demo, regra quadro a quadro. O Drive&Act saiu antes de contar alarmes (rosto achado em 1% a 28% dos quadros).
 
+**Correção em 14/11 (referência do EAR na fusão):** a primeira execução usou, por engano, a **mediana** do EAR nos primeiros 30 s como referência da fusão, como estava escrito no protocolo. A fusão aprovada na condição 1 (seção 6.3) usa o **percentil 75** (`referencia`, seção 2.1). O código foi corrigido para o percentil 75 e tudo foi rodado de novo; as tabelas abaixo já são as corrigidas. A conclusão não muda. Valores da primeira execução, com a mediana: UTA 4,6/h, total 5,5/h (−1,1, de −5,2 a +1,3), BINUS 44 achados e F2 0,337. O Eyeblink8 e o holdout do FL3D deram iguais. A demo do PR da fusão foi corrigida do mesmo jeito.
+
 ### Condição 2 da seção 10.4: alarmes de microssono por hora em pessoas acordadas
 
 | Base | Vídeos | Horas | Rosto achado | YOLO com filtro | Fusão pela média | Fusão − YOLO (IC95%) |
 |---|---|---|---|---|---|---|
 | Eyeblink8 | 8 | 0,66 | 99,7% | 10,6 /h | 18,2 /h | +7,6 /h (+2,4 a +15,0) |
-| UTA-RLDD, classe alerta | 60 | 9,53 | 100% | 6,3 /h | 4,6 /h | −1,7 /h (−6,0 a +0,6) |
-| **Total, pesado pelo tempo** | 68 | 10,19 | 99,9% | **6,6 /h** | **5,5 /h** | −1,1 /h (−5,2 a +1,3) |
+| UTA-RLDD, classe alerta | 60 | 9,53 | 100% | 6,3 /h | 4,8 /h | −1,5 /h (−5,6 a +0,8) |
+| **Total, pesado pelo tempo** | 68 | 10,19 | 99,9% | **6,6 /h** | **5,7 /h** | −0,9 /h (−4,8 a +1,5) |
 
-- **Pelo critério da 10.4, a fusão passa na condição 2:** a taxa somada (5,5 por hora) não é maior que a do YOLO (6,6 por hora). Junto com a condição 1, já medida pelo Rafael, a fusão vira o sistema de microssono.
-- **A diferença no total não é conclusiva:** o intervalo vai de −5,2 a +1,3 por hora.
+- **Pelo critério da 10.4, a fusão passa na condição 2:** a taxa somada (5,7 por hora) não é maior que a do YOLO (6,6 por hora). Junto com a condição 1, já medida pelo Rafael, a fusão vira o sistema de microssono.
+- **A diferença no total não é conclusiva:** o intervalo vai de −4,8 a +1,5 por hora.
 - **No Eyeblink8 a fusão é pior, de forma conclusiva** (+7,6 por hora, intervalo sem zero). O Eyeblink8 é uma webcam comum em ambiente interno, com piscadas rápidas, que é o caso mais parecido com a demo. Pela 10.4, essa piora numa base isolada entra como limitação no paper.
 - O UTA pesa 94% das horas, então o total segue o UTA.
 
@@ -58,9 +60,9 @@ Script: `experimentos/testes_bases_novas.py`. Sistemas idênticos aos do noteboo
 | Sistema | Episódios de 1 s ou mais | Achados | Recall | Falsos alarmes | Precisão por alarme | F1 | F2 |
 |---|---|---|---|---|---|---|---|
 | YOLO com filtro | 152 | 48 | 0,316 | 4 (5,1/h) | 0,923 | 0,471 | 0,364 |
-| Fusão pela média | 152 | 44 | 0,289 | 0 (0,0/h) | 1,000 | 0,449 | 0,337 |
+| Fusão pela média | 152 | 46 | 0,303 | 0 (0,0/h) | 1,000 | 0,465 | 0,352 |
 
-- **Fusão − YOLO, F2:** −0,027 (IC95% de −0,067 a +0,010), sem diferença conclusiva. Recall: de −0,065 a +0,007. Falsos alarmes: de −10 a 0.
+- **Fusão − YOLO, F2:** −0,012 (IC95% de −0,052 a +0,025), sem diferença conclusiva. Recall: de −0,051 a +0,022. Falsos alarmes: de −10 a 0.
 - **Os dois sistemas acham só cerca de 30% dos fechamentos de 1 s ou mais na BINUS,** contra cerca de 90% no FL3D. O motivo ainda não foi investigado. Hipóteses a conferir: a BINUS tem 6 quadros por segundo (a regra foi pensada para 25), o rótulo é por caixa desenhada à mão a cada 5 quadros, e as pessoas, câmeras e acessórios (óculos, boné, hijab) são diferentes. Essa queda é o resultado mais importante desta etapa, porque mostra o quanto o FL3D é otimista.
 - **Contagem de episódios diferente da do Rafael:** aqui deram 152 fechamentos de 1 s ou mais; o `docs/bases_candidatas.md` fala em 93. A definição deste protocolo (todas as caixas de olho fechadas, buracos de até 0,5 s juntados) foi mantida. A diferença precisa ser conferida com o Rafael antes do paper.
 - Primeira execução com o nome do rótulo errado (`mata_tertutup` em vez de `mata_terpejam`): achou 0 episódios e foi descartada; ver o protocolo.
@@ -80,7 +82,7 @@ Script: `experimentos/laya_cerebro.py` (etapas `logistica`, `finetune`, `prever_
 | Base | Sistema | Achados (de 1 s ou mais) | Falsos | Falsos por hora | Recall | Precisão | F2 |
 |---|---|---|---|---|---|---|---|
 | BINUS (47 vídeos, 152 episódios) | YOLO com filtro | 48 | 4 | 5,1 | 0,316 | 0,923 | 0,364 |
-| | Fusão | 44 | 0 | 0,0 | 0,289 | 1,000 | 0,337 |
+| | Fusão | 46 | 0 | 0,0 | 0,303 | 1,000 | 0,352 |
 | | Logística | 58 | 9 | 11,5 | 0,382 | 0,866 | 0,430 |
 | | **Laya (semente 0)** | **83** | 6 | 7,7 | **0,546** | 0,933 | **0,595** |
 | FL3D holdout (5 vídeos, 14 episódios) | YOLO com filtro | 13 | 2 | 21,9 | 0,929 | 0,867 | 0,915 |
@@ -93,7 +95,7 @@ Script: `experimentos/laya_cerebro.py` (etapas `logistica`, `finetune`, `prever_
 | | Laya (semente 0) | — | 23 | **34,8** | — | — | — |
 
 Diferenças (bootstrap pareado por vídeo, 5.000 sorteios, IC95%):
-- **BINUS, F2:** Laya − YOLO **+0,232 (+0,118 a +0,352)**; Laya − logística **+0,166 (+0,086 a +0,249)**; Laya − fusão +0,258 (+0,154 a +0,372).
+- **BINUS, F2:** Laya − YOLO **+0,232 (+0,118 a +0,352)**; Laya − logística **+0,166 (+0,086 a +0,249)**; Laya − fusão +0,244 (+0,140 a +0,355).
 - **Eyeblink8, falsos por hora:** Laya − YOLO **+24,2 (+4,8 a +55,6)**; Laya − fusão +16,7 (−1,1 a +46,7); Laya − logística −113,5 (−176,5 a −62,2).
 - **FL3D holdout, F2:** Laya − YOLO −0,049 (−0,082 a 0,000). Só 5 vídeos e 14 episódios: confirmação fraca, como dizia o protocolo.
 
@@ -124,14 +126,14 @@ Protocolo escrito antes de rodar (fim de `docs/protocolo_laya.md`); script `expe
 | Sistema | Alarmes falsos por hora |
 |---|---|
 | YOLO com filtro (regra atual) | **6,3** |
-| Fusão | **4,6** |
+| Fusão | **4,8** |
 | Laya, 1 janela | 43,8 |
 | **Laya, 2 janelas** | **21,6** |
 | Logística, 1 janela | 141,8 |
 | Logística, 2 janelas | 121,2 |
 
 - Laya com espera − regra atual: **+15,3 por hora (IC95% +6,4 a +27,3)**. **Falha na condição 2**, de forma conclusiva.
-- Laya com espera − fusão: +17,0 (+6,8 a +30,1). Laya com espera − logística com espera: −99,5 (−139,7 a −64,5).
+- Laya com espera − fusão: +16,8 (+6,7 a +29,8). Laya com espera − logística com espera: −99,5 (−139,7 a −64,5).
 
 **Exploratório (bases já vistas):** a espera cortou os alarmes falsos no Eyeblink8 (34,8 → 19,7 por hora, ainda acima dos 10,6 da regra), mas **levou junto o ganho na BINUS:** 56 de 152 achados (F2 0,419) contra 83 (0,595) sem espera e 48 (0,364) da regra. No holdout do FL3D, caiu para 5 de 14.
 

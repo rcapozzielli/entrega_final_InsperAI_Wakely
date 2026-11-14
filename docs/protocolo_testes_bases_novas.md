@@ -49,3 +49,7 @@ O protocolo dizia que "olho fechado" na BINUS é `mata_tertutup`. Na base, o ró
 - **Drive&Act é infravermelho próximo**, como o treino do YOLO (MRL), mas com outra câmera e outro ângulo. O MediaPipe pode achar menos rostos; a fração com rosto é reportada.
 - **A BINUS tem 6 quadros por segundo,** e não 25 ou 30. A regra de tempo funciona em segundos, mas o filtro de bocejo e a junção de buracos foram pensados em 25 fps.
 - **Microssonos encenados** na BINUS.
+
+## Correção em 14/11, depois de rodar: referência do EAR
+
+A tabela de sistemas acima diz "mediana do EAR nos primeiros 30 s com rosto". Isso estava errado: a fusão que passou na condição 1 (seção 6.3) usa o **percentil 75** do EAR nos primeiros 30 s (`referencia`, seção 2.1), e o objetivo deste protocolo era medir **esse** sistema. A correção não escolhe nada olhando o resultado: ela só faz o código seguir a definição do notebook. As duas versões estão no registro (`docs/registro_antonio_13-11.md`, seção 3), e a fusão passa na condição 2 com as duas (5,5 e 5,7 por hora, contra 6,6 do YOLO).
