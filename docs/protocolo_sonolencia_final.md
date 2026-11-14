@@ -230,6 +230,53 @@ Numa seção nova, **12. Modelo final de sonolência**. A seção 11 fica reserv
 - **O MIL-Transformer foi destacado depois de ver a 8.7.** A SUST é o teste novo que a 8.7 pedia, e só ela pode confirmá-lo.
 - **Agrupamento dos motoristas à mão:** se dois grupos forem a mesma pessoa, o bootstrap subestima a incerteza.
 
+## Análise de erros na SUST-DDD (exploratória, seção 12.1)
+
+Aprovada pelo Rafael em 13/11/2026, **depois de ver as tabelas do critério na SUST e antes de qualquer resultado na UL-DD**. Como a 8.6, ela é exploratória.
+
+**Regras:**
+- **Não muda o critério nem os candidatos.**
+- **Hipótese para a UL-DD:** se a análise sugerir uma, ela é escrita antes de rodar a UL-DD e testada lá só como teste exploratório separado, sem mudar o modelo final.
+
+**Lista fixada antes de olhar:**
+1. **Entre e dentro do motorista:**
+   - a AUC de cada candidato dentro de cada motorista com as duas classes;
+   - quanto o PERCLOS sobe do alerta ao sonolento na mesma pessoa;
+   - quanto o PERCLOS varia entre os motoristas, nas sequências alertas.
+2. **Tamanho do olho:** o EAR de olho aberto de cada sequência e o acerto por terço desse EAR, separado por classe. O acerto é medido no PERCLOS absoluto e no combinado, com os limiares do UTA.
+3. **Câmera e luz:** quanto o brilho (`continuidade.csv`), a pose média absoluta e a taxa de rosto separam as classes sozinhos, e o acerto por terço do brilho. A AUC de cada eixo da Δ pose, para ver de onde vem o controle de 0,639.
+4. **Queda do MIL-Transformer:** a média e o desvio de cada um dos 14 canais e dos 16 atributos Δ, depois da normalização e da padronização do UTA, comparados entre UTA, DROZY e SUST.
+5. **Duração:** o acerto de cada candidato por número de minutos avaliados (1, 2 e 3 ou mais).
+
+## Hipóteses da 12.1 testadas na UL-DD (exploratórias)
+
+Aprovadas pelo Rafael em 13/11/2026, **depois de ver a 12.1 e antes de qualquer modelo rodar na UL-DD** (até aqui, só a taxa de rosto da UL-DD foi calculada: 99,93%). Elas não mudam o critério nem o modelo final.
+
+- **H1, duração:** na SUST, o acerto subiu com o número de minutos avaliados. Na UL-DD, recalculamos a AUC de cada candidato usando só os primeiros 1, 3, 10 e 39 minutos depois da calibração.
+  - **O que se espera:** a AUC do PERCLOS combinado e das duas MILs sobe de 1 para 39 minutos.
+  - **Como as redes rodam:** as treinadas só no UTA, sem ajuste, com o saco cortado nos primeiros k minutos.
+- **H2, giro da cabeça:** na SUST, o desvio do yaw ficou 2,1 vezes o do UTA, e a hipótese é que isso derrubou o MIL-Transformer. Na UL-DD (simulador), medimos o desvio do yaw e do "desvio do yaw" em unidades do UTA, como no item 4 da 12.1.
+  - **O que se espera:** os dois desvios ficam abaixo de 1,5.
+  - **E também:** a diferença MIL-Transformer − PERCLOS absoluto na UL-DD fica acima da diferença na SUST (−0,143).
+- **H3, olho pequeno:** na SUST, o EAR de olho aberto separou as classes sozinho (AUC 0,39).
+  - **O que se mede na UL-DD:** a AUC do EAR de olho aberto sozinho (por sessão, mediana dos minutos avaliados); a AUC entre pessoas de cada candidato; e, nas pessoas com sessões das duas classes, a fração em que a sessão sonolenta recebe a nota maior (AUC dentro da pessoa).
+  - **O que se espera:** a AUC dentro da pessoa fica bem acima da AUC entre pessoas.
+
+## Exploratório: fine-tuning com a SUST, teste na UL-DD
+
+Aprovado pelo Rafael em 13/11/2026, **antes de ver a análise de erros da 12.1 e antes de qualquer resultado na UL-DD**. Ele não muda o critério nem o modelo final, que foram fixados sem esse candidato.
+
+**Pergunta:** treinar também com dados de direção real (SUST-DDD) ajuda as redes a generalizar para uma base nova?
+
+**Desenho:**
+- **Treino:** a MIL-GRU-4 e a MIL-Transformer-14 com os mesmos hiperparâmetros da parte B da 8.7, as mesmas épocas (12 e 10) e as mesmas 5 sementes, nas 118 sequências do UTA mais as 34 da SUST (2 min ou mais). As duas bases também entram juntas na padronização dos canais e dos atributos. A SUST usa a mesma normalização pelo 1º minuto.
+- **Teste:** só na UL-DD, e só se ela passar nas condições da emenda.
+- **Comparações (AUC por sessão, bootstrap pareado por pessoa, 2.000 sorteios):**
+  - MIL-GRU-4 com SUST − MIL-GRU-4 só UTA;
+  - MIL-Transformer-14 com SUST − MIL-Transformer-14 só UTA;
+  - PERCLOS combinado com a GRU-4 nova − PERCLOS combinado original. A padronização do logit continua com a média e o desvio do UTA, das previsões da GRU-4 nova no UTA.
+- **Leitura:** é um resultado exploratório. Se ajudar, ele entra no paper como resultado e como próximo passo, sem trocar o modelo final. A SUST deixa de ser teste para essas redes novas, mas continua teste para as originais.
+
 ## Exploratório futuro: calibrar na sessão alerta da mesma pessoa
 
 Ideia do Rafael em 13/11/2026. Fica **fora do critério** e só roda depois dele, com protocolo próprio.
