@@ -12,7 +12,7 @@ RegraAlerta repete, quadro a quadro e em segundos, a regra das seções 6 e 7 do
 
 SinalOlho escolhe o sinal que entra na regra (14/11/2026). Por padrão é a FUSÃO pela média da seção 6.3, que virou o
 sistema de microssono pelo critério da 10.4: (fechamento pelo EAR + P(fechado)) / 2, com fechamento =
-1 − EAR / referência cortado em [0, 1] e referência = mediana do EAR nos primeiros 30 s com rosto, limiar 0,35.
+1 − EAR / referência cortado em [0, 1] e referência = percentil 75 do EAR nos primeiros 30 s com rosto (a `referencia` da seção 2.1), limiar 0,35.
 Diferença para o notebook: lá a referência vale também para os próprios 30 s; ao vivo ela ainda não existe, então
 nesses 30 s a regra usa o YOLO sozinho, com o limiar 0,4.
 
@@ -21,7 +21,7 @@ mostra. Os tempos da máquina (10 s sem rosto, 60 s de histerese, 5 min entre av
 demo e NÃO foram validados em dados: servem para o painel não piscar nem repetir avisos.
 """
 from collections import deque
-from statistics import median
+from statistics import quantiles
 
 LIMIAR_OLHO = 0.4          # P(fechado) médio dos dois olhos (seção 7, YOLO com filtro)
 LIMIAR_FUSAO = 0.35        # fusão pela média (escolhido na calibração do FL3D, seção 6.3)
@@ -56,6 +56,11 @@ class Trecho:
         return 0.0 if self.ini is None else self.ultimo - self.ini + dt
 
 
+def p75(x):
+    """Percentil 75 com interpolação linear, igual ao pandas .quantile(0.75) do notebook."""
+    return x[0] if len(x) == 1 else quantiles(x, n=4, method="inclusive")[2]
+
+
 class SinalOlho:
     """Sinal do olho que entra na regra: "yolo" (P(fechado) médio) ou "fusao" (padrão). Devolve (valor, limiar)."""
 
@@ -76,10 +81,10 @@ class SinalOlho:
         if self.ref is None:
             if self.t_rosto is None:
                 self.t_rosto = t
-            if ear is not None and t <= self.t_rosto + REF_EAR_S + 1e-6:
+            if ear is not None and t < self.t_rosto + REF_EAR_S - 1e-6:
                 self.ears.append(ear)
             if t >= self.t_rosto + REF_EAR_S - 1e-6 and self.ears:
-                self.ref = float(median(self.ears))
+                self.ref = float(p75(self.ears))
         if self.ref is None or ear is None or self.ref <= 0:
             return p_fech, LIMIAR_OLHO           # ainda calibrando o EAR: YOLO sozinho
         fech = min(max(1 - ear / self.ref, 0.0), 1.0)
