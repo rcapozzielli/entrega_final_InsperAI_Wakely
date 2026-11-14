@@ -115,6 +115,32 @@ Diferenças (bootstrap pareado por vídeo, 5.000 sorteios, IC95%):
 - A condição 2 ficou só com o Eyeblink8 (0,66 h), porque o UTA não fazia parte deste protocolo.
 - O protocolo não previa juntar o Laya com o tempo mínimo da regra (por exemplo, exigir duas janelas seguidas). Isso é **trabalho futuro**, e teria que ser fixado e testado em outra base para não escolher olhando a BINUS e o Eyeblink8.
 
+### Segunda tentativa: Laya com espera de 1 s (2 janelas seguidas)
+
+Protocolo escrito antes de rodar (fim de `docs/protocolo_laya.md`); script `experimentos/laya_espera.py`. O mesmo modelo da semente 0, sem treinar de novo; o alarme só dispara com 2 janelas `microssono` seguidas. Nenhum outro valor foi testado.
+
+**Confirmatório, UTA-RLDD classe alerta** (60 pessoas, 9,53 h, 68.355 janelas, base que nenhum modelo de janela viu; todo alarme é falso):
+
+| Sistema | Alarmes falsos por hora |
+|---|---|
+| YOLO com filtro (regra atual) | **6,3** |
+| Fusão | **4,6** |
+| Laya, 1 janela | 43,8 |
+| **Laya, 2 janelas** | **21,6** |
+| Logística, 1 janela | 141,8 |
+| Logística, 2 janelas | 121,2 |
+
+- Laya com espera − regra atual: **+15,3 por hora (IC95% +6,4 a +27,3)**. **Falha na condição 2**, de forma conclusiva.
+- Laya com espera − fusão: +17,0 (+6,8 a +30,1). Laya com espera − logística com espera: −99,5 (−139,7 a −64,5).
+
+**Exploratório (bases já vistas):** a espera cortou os alarmes falsos no Eyeblink8 (34,8 → 19,7 por hora, ainda acima dos 10,6 da regra), mas **levou junto o ganho na BINUS:** 56 de 152 achados (F2 0,419) contra 83 (0,595) sem espera e 48 (0,364) da regra. No holdout do FL3D, caiu para 5 de 14.
+
+**Conclusão das duas tentativas:**
+- O Laya, decidindo sobre os mesmos sinais do Wakely, **não substitui a regra de tempo**.
+- O ganho de recall na BINUS vinha de disparar cedo, com uma janela só. Ao exigir o mesmo 1 s da regra, ele quase desaparece, e os alarmes falsos em pessoas acordadas continuam de 3 a 4 vezes os da regra.
+- **O Laya sempre ganhou da logística com os mesmos campos,** o que mostra que ele aprende alguma coisa dos números, mas não o bastante para o uso.
+- Fica no paper como **experimento negativo, documentado**. A decisão do Wakely continua sendo a regra, com a fusão.
+
 ## 4. Gravações: continuação
 
 - **Isso é uma hipótese, não um resultado:** vem de uma pessoa, com microssonos encenados. Ela precisa ser confirmada em pessoas que não participaram da ideia, como manda a 10.3 (Drive&Act).

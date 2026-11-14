@@ -121,3 +121,13 @@ O Drive&Act saiu dos testes (o MediaPipe achou o rosto em 1% a 28% dos quadros; 
 - **Bases da condição 2:** só o Eyeblink8 (o Drive&Act saiu, e o UTA não faz parte deste protocolo). Os falsos alarmes da BINUS são mostrados à parte.
 - **Conferência do código:** a regra atual medida por esta avaliação deu os mesmos números de `testes_bases_novas.py` (BINUS 48 e 44 achados; Eyeblink8 10,6 e 18,2 por hora).
 - **Mudança em 14/11, 1h45, antes de qualquer previsão do Laya:** cada semente levou cerca de 2h20 nesta máquina, e o grupo decidiu, por tempo, **ficar só com a semente 0**. As sementes 1 e 2 não foram treinadas. O resultado do Laya é de uma semente só e não mostra a variação entre sementes; isso entra como limitação.
+
+## Segunda tentativa: Laya com espera de 1 s (escrita em 14/11, antes de rodar)
+
+**Por que existe:** o Laya da semente 0 passou nas condições 1 e 3, mas falhou na 2 (34,8 alarmes falsos por hora no Eyeblink8, contra 10,6 da regra). Ele dispara com uma janela só, enquanto a regra atual espera o olho ficar fechado por T = 1 s. **Esta tentativa foi pensada depois de ver esse resultado**, então a BINUS, o Eyeblink8 e o holdout do FL3D já não servem para confirmar nada: eles aparecem só como **exploratórios**.
+
+**A única mudança, fixada antes de rodar:** o alarme só dispara quando há **2 janelas seguidas** classificadas como `microssono`, o que dá 1 s com o passo de 0,5 s. O valor 2 vem do T = 1 s da regra do notebook, e **não foi escolhido testando valores**; nenhum outro valor (3, 4, limiares de probabilidade) será testado. O alarme cai no fim da segunda janela, e janelas `microssono` seguidas continuam valendo um alarme só. O mesmo vale para a logística, para a comparação ser justa. O modelo do Laya não muda (o mesmo fine-tuning da semente 0, sem treinar de novo).
+
+**Teste confirmatório (base que nenhum modelo de janela viu):** a classe alerta do **UTA-RLDD** (60 pessoas, 9,5 h, 10 quadros por segundo, os mesmos sinais em cache da seção 3), em que todo alarme é falso. As janelas são montadas do mesmo jeito (`janelas.py`), com os trechos de cada pessoa juntados na ordem dos minutos, como em `testes_bases_novas.py`.
+
+**Critério:** o Laya com espera passa na condição 2 se der **não mais alarmes falsos por hora que a regra atual (YOLO com filtro, 6,3 por hora) no UTA alerta**, e o intervalo (bootstrap pareado por pessoa, 5.000 sorteios) é reportado. Como não sobrou nenhuma base de microssono nunca vista, o F2 da BINUS com espera é só exploratório. **Mesmo que passe, o Laya não vira o sistema do Wakely por esta tentativa**: o resultado vira uma recomendação para testar em uma base de microssono nova.
