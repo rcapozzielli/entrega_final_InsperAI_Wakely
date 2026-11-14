@@ -146,3 +146,77 @@ Protocolo escrito antes de rodar (fim de `docs/protocolo_laya.md`); script `expe
 ## 4. Gravações: continuação
 
 - **Isso é uma hipótese, não um resultado:** vem de uma pessoa, com microssonos encenados. Ela precisa ser confirmada em pessoas que não participaram da ideia, como manda a 10.3 (Drive&Act).
+
+## 5. Limiar adaptativo (frente C, 14/11; protocolo `docs/protocolo_limiar_adaptativo.md`, com o adendo de 14/11)
+
+Scripts: `experimentos/limiar_adaptativo_fl3d.py` (roda dentro do kernel do notebook, depois da seção 6.3) e `experimentos/limiar_adaptativo.py` (bases de teste). O adendo foi commitado antes de calcular qualquer número adaptativo.
+
+**Como funciona:** b = percentil 25 do P(fechado) do YOLO nos primeiros 30 s da pessoa. O sinal do YOLO vira (P − b)/(1 − b), e o limiar efetivo sobe de L para b + L·(1 − b). Y-A é o YOLO adaptativo; F-A é a fusão com o YOLO adaptativo.
+
+**Conferências:** os números de hoje se repetem (Y: 143,2 de 165, 10,2 falsos, F2 0,880; F: 149,6, 6,0, F2 0,917). Com b = 0, Y-A e F-A são idênticos a Y e F. Nas bases de teste, Y e F dão exatamente os alarmes da condição 2, em todas as unidades.
+
+### A linha de base b é quase zero, como previsto no adendo
+
+| Base | Mediana de b | Máximo | Unidades com b > 0,05 | Calibrações recusadas |
+|---|---|---|---|---|
+| FL3D, 44 vídeos (semente 42) | 0,0002 | 0,49 | 1 | 2 |
+| UTA alerta, 60 pessoas | 0,0001 | 0,056 | 1 | 0 |
+| Eyeblink8, 8 vídeos | 0,00001 | 0,0004 | 0 | 0 |
+
+O YOLO dá P(fechado) quase zero no olho aberto de quase todo mundo, então não há linha de base para descontar.
+
+### FL3D, validação cruzada (44 vídeos, 5 sementes, com filtro)
+
+| Sistema | Acertos 1 s+ (de 165) | Falsos | F2 |
+|---|---|---|---|
+| Y | 143,2 | 10,2 | 0,880 |
+| **F (vencedor da etapa 1)** | **149,6** | **6,0** | **0,917** |
+| Y-A | 142,4 | 9,4 | 0,877 |
+| F-A | 148,6 | 7,4 | 0,911 |
+
+- Y-A − Y, F2: −0,003 (IC95% −0,021 a +0,008).
+- F-A − F, F2: −0,007 (IC95% −0,019 a +0,001). Falsos: +1,4 (+0,4 a +2,4).
+- O desafiante, pelo maior F2, é F-A.
+
+### Bases de teste (alarmes por hora; todo alarme é falso)
+
+Limiares da semente 42 escolhidos na calibração: Y 0,40, F 0,35, **Y-A 0,35**, F-A 0,35.
+
+| Base | Y | F | Y-A | F-A |
+|---|---|---|---|---|
+| Eyeblink8 (0,66 h) | 10,6 | 18,2 | 16,6 | 18,2 |
+| UTA alerta (9,53 h) | 6,3 | 4,8 | 7,8 | 4,8 |
+| **Soma (10,19 h)** | **6,6** | **5,7** | **8,3** | **5,7** |
+| UTA sonolenta (9,39 h, só descrição) | 64,8 | 62,3 | 67,3 | 62,0 |
+
+- **Y-A − Y na soma:** +1,8 por hora (IC95% +0,5 a +3,5). É pior, mas não por causa da adaptação: como b ≈ 0, Y-A é quase o próprio YOLO, e a calibração escolheu para ele o limiar 0,35 em vez de 0,40. O limiar mais baixo é que dispara mais.
+- **F-A − F:** 0 em todas as bases. Os alarmes são idênticos.
+
+### Leitura pelo critério da 10.4 (etapa 2)
+
+| Condição | F-A contra F |
+|---|---|
+| 1. F2 maior, IC sem zero | **Não passa** (−0,007, de −0,019 a +0,001) |
+| 2. Alarmes por hora não maiores | Passa (empate: 5,7 e 5,7) |
+
+**Conclusão: o limiar adaptativo não entra.** O sistema final de microssono continua sendo **F, a fusão pela média** (limiar 0,35). Pelo protocolo, Y-A não é testado no lugar de F-A.
+
+### O que responde à banca (descrição, não critério)
+
+**O viés do olho pequeno existe, e quem já o reduz é a referência do EAR da fusão, não o limiar do YOLO.** Na classe alerta do UTA, separando as pessoas em terços pelo EAR de olho aberto:
+
+| Terço do EAR de olho aberto | Y | F | Y-A | F-A |
+|---|---|---|---|---|
+| Menor (< 0,239, 20 pessoas) | 17,9 | 13,0 | 22,0 | 13,0 |
+| Do meio (20 pessoas) | 0,0 | 0,6 | 0,3 | 0,6 |
+| Maior (≥ 0,265, 20 pessoas) | 0,7 | 0,7 | 0,7 | 0,7 |
+
+- Quase todos os alarmes falsos vêm do terço de olho menor, com todos os sistemas.
+- A fusão, que mede o EAR em relação à referência da própria pessoa, corta esse terço de 17,9 para 13,0 por hora. A pessoa com mais alarmes (EAR aberto 0,198) cai de 37 para 19.
+- O desconto da linha de base do YOLO não muda nada, porque o YOLO já diz "aberto" com P ≈ 0 para quem tem o olho pequeno. Os alarmes dessas pessoas vêm de momentos em que o YOLO passa do limiar, e não de uma linha de base alta.
+
+**Limitações:**
+- O UTA mostrou o viés que motivou a frente C, então ele não é uma base independente para essa descrição.
+- Há poucos alarmes: uma pessoa dá 37 dos 60 do YOLO no UTA.
+- O protocolo não foi aprovado pelo Rafael antes de rodar (ver o adendo).
+- **Trabalho futuro:** uma linha de base que varie entre pessoas, por exemplo um percentil alto do P(fechado) ou o tempo acima do limiar no começo do uso. Precisa de protocolo próprio e de uma base de teste que não seja o UTA.
