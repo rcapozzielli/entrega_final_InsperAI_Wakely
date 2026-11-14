@@ -159,3 +159,26 @@ Numa subseção nova, **10.6 Limiar adaptativo e alarmes nas bases de teste (fre
 - Adaptar também o EAR, o filtro de bocejo ou o T à pessoa.
 - Outras bases (BINUS, SUST-DDD, gravações do grupo). A BINUS mediria o recall fora do FL3D e fica para um protocolo próprio.
 - O piso de 3 s (frente D).
+
+## Adendo de 14/11/2026 (Antônio), escrito antes de calcular qualquer limiar adaptativo
+
+**Aprovação.** O rascunho não chegou a ser aprovado pelo Rafael. Para caber no cronograma, o Antônio decidiu rodá-lo em 14/11 **sem mudar os candidatos nem as definições** (janela de 30 s, percentil 25, regra de recusa, filtro, T, grade de limiares, critério). O Rafael revisa no PR. Se ele discordar de algo, o resultado passa a ser exploratório.
+
+**O que já se sabia antes de rodar:**
+
+1. **A etapa 1 já foi resolvida** pelo `docs/protocolo_testes_bases_novas.md`. O Drive&Act saiu da condição 2 (rosto em 1% a 28% dos quadros, decisão do grupo em 13/11). A fusão F passou com 5,7 alarmes por hora, contra 6,6 do YOLO, somando a classe alerta do UTA e o Eyeblink8. Esse número já tem a referência do EAR corrigida para o percentil 75 da seção 2.1. O vencedor da etapa 1 é F, e os alarmes de Y e F nessas bases já foram vistos.
+2. **A linha de base b deve sair perto de 0.** Na seção 12, o mesmo b (percentil 25 do P(fechado) nos primeiros 30 s) teve mediana 0 no UTA, no DROZY e na SUST-DDD, e só 1 de 188 vídeos passou de 0,05, porque o YOLO dá P(fechado) quase zero no olho aberto. A expectativa, escrita antes de rodar, é **Y-A ≈ Y e F-A ≈ F**. O teste roda mesmo assim, com a definição do rascunho. Trocar o percentil agora seria escolher a definição olhando uma base de teste (o UTA). Uma linha de base diferente, por exemplo um percentil mais alto, fica como trabalho futuro, com protocolo próprio.
+
+**O que muda na execução (os candidatos não mudam):**
+
+- **Bases de teste com os mesmos sinais e a mesma regra da condição 2** (`experimentos/testes_bases_novas.py`):
+  - classe alerta do UTA: `data/cache/rldd_rico`, YOLO da semente 42, 10 fps, 60 pessoas, minutos em ordem;
+  - Eyeblink8: `data/cache/sinais`, `ExtratorRosto` da demo, 30 fps, todos os quadros;
+  - regra da demo (`RegraAlerta`) quadro a quadro e em segundos, que repete a regra do notebook nos 44 vídeos do FL3D (163 de 163). Como ela trabalha em segundos, os 30 fps do Eyeblink8 não precisam de conversão.
+  - Motivo: assim Y e F nessas bases são exatamente os números da condição 2 já reportados. Outra extração daria dois números diferentes para o mesmo sistema.
+  - O item 2 da conferência (64 alarmes em `data/cache/rldd`) é trocado por este: Y e F reproduzem `testes_bases_novas.py` (UTA 6,30 e 4,83 por hora; Eyeblink8 10,6 e 18,2).
+- **Janela de calibração nas bases de teste:** os primeiros 30 s da sequência (t < t₀ + 30), só nos quadros com rosto. A regra de recusa é a do rascunho: menos de 5 s com rosto, ou b > 0,5, dá b = 0. No FL3D, vale a janela da `referencia` (quadros < início + 30·FPS).
+- **Limiares de Y-A e F-A nas bases de teste:** `limiar_na_calibracao` com filtro, semente 42, como no rascunho. Y e F ficam com 0,40 e 0,35.
+- **Classe sonolenta do UTA (descrição):** mesmos sinais, classe 1.
+- **Terço do olho pequeno:** o "EAR de olho aberto" de cada pessoa é a mediana do EAR nos quadros com rosto e P(fechado) < 0,5 da sequência alerta, como o atributo da seção 8.2.
+- **Unidades e bootstrap:** como no rascunho. No UTA a unidade é a pessoa; no Eyeblink8, o vídeo. Na soma, o sorteio é estratificado por base. São 5.000 sorteios com semente 42.
