@@ -10,13 +10,22 @@ RegraAlerta repete, quadro a quadro e em segundos, a regra das seções 6 e 7 do
 - microssono: olho fechado por T = 1 s, sem bocejo (limite inferior da faixa do Euro NCAP);
 - piso: olho fechado por 3 s ou mais avisa como sono MESMO durante bocejo, e 6 s ou mais como "sem resposta".
 
+SinalOlho escolhe o sinal que entra na regra (14/11/2026). Por padrão é a FUSÃO pela média da seção 6.3, que virou o
+sistema de microssono pelo critério da 10.4: (fechamento pelo EAR + P(fechado)) / 2, com fechamento =
+1 − EAR / referência cortado em [0, 1] e referência = percentil 75 do EAR nos primeiros 30 s com rosto (a `referencia` da seção 2.1), limiar 0,35.
+Diferença para o notebook: lá a referência vale também para os próprios 30 s; ao vivo ela ainda não existe, então
+nesses 30 s a regra usa o YOLO sozinho, com o limiar 0,4.
+
 MaquinaEstados junta a regra com o MonitorSonolencia (PERCLOS do último minuto e MIL) e decide o que o painel
 mostra. Os tempos da máquina (10 s sem rosto, 60 s de histerese, 5 min entre avisos de sonolência) são escolhas da
 demo e NÃO foram validados em dados: servem para o painel não piscar nem repetir avisos.
 """
 from collections import deque
+from statistics import quantiles
 
 LIMIAR_OLHO = 0.4          # P(fechado) médio dos dois olhos (seção 7, YOLO com filtro)
+LIMIAR_FUSAO = 0.35        # fusão pela média (escolhido na calibração do FL3D, seção 6.3)
+REF_EAR_S = 30.0           # s com rosto para a referência do EAR (seção 2.1)
 BURACO_FECH = 3 / 25       # s: trechos fechados separados por até isso viram um só
 T_MICRO = 1.0              # s: microssono (Euro NCAP, limite inferior)
 T_SONO = 3.0               # s: piso de sono, vale mesmo durante bocejo
@@ -47,8 +56,51 @@ class Trecho:
         return 0.0 if self.ini is None else self.ultimo - self.ini + dt
 
 
+def p75(x):
+    """Percentil 75 com interpolação linear, igual ao pandas .quantile(0.75) do notebook."""
+    return x[0] if len(x) == 1 else quantiles(x, n=4, method="inclusive")[2]
+
+
+class SinalOlho:
+    """Sinal do olho que entra na regra: "yolo" (P(fechado) médio) ou "fusao" (padrão). Devolve (valor, limiar)."""
+
+    def __init__(self, tipo="fusao"):
+        if tipo not in ("yolo", "fusao"):
+            raise ValueError(tipo)
+        self.tipo = tipo
+        self.reiniciar()
+
+    def reiniciar(self):
+        self.t_rosto, self.ears, self.ref = None, [], None
+
+    def passo(self, t, p_fech, ear):
+        if p_fech is None:                       # sem rosto
+            return None, self.limiar()
+        if self.tipo == "yolo":
+            return p_fech, LIMIAR_OLHO
+        if self.ref is None:
+            if self.t_rosto is None:
+                self.t_rosto = t
+            if ear is not None and t < self.t_rosto + REF_EAR_S - 1e-6:
+                self.ears.append(ear)
+            if t >= self.t_rosto + REF_EAR_S - 1e-6 and self.ears:
+                self.ref = float(p75(self.ears))
+        if self.ref is None or ear is None or self.ref <= 0:
+            return p_fech, LIMIAR_OLHO           # ainda calibrando o EAR: YOLO sozinho
+        fech = min(max(1 - ear / self.ref, 0.0), 1.0)
+        return (fech + p_fech) / 2, LIMIAR_FUSAO
+
+    def limiar(self):
+        return LIMIAR_FUSAO if self.tipo == "fusao" and self.ref is not None else LIMIAR_OLHO
+
+    def nome(self):
+        if self.tipo == "yolo":
+            return "P(olho fechado), do YOLO"
+        return "fusão EAR + YOLO" if self.ref is not None else "YOLO (calibrando o EAR)"
+
+
 class RegraAlerta:
-    """Recebe (t em s, P(fechado) médio ou None sem rosto, abertura da boca) e devolve os avisos novos."""
+    """Recebe (t em s, sinal do olho ou None sem rosto, abertura da boca, limiar) e devolve os avisos novos."""
 
     def __init__(self):
         self.reiniciar()
@@ -69,12 +121,12 @@ class RegraAlerta:
             self.bocejo_ate = t + BOCA_MARGEM
         return t <= self.bocejo_ate + 1e-6
 
-    def passo(self, t, p_fech, boca):
+    def passo(self, t, p_fech, boca, limiar=None):
         if self.t_ant is not None and t > self.t_ant:
             self.dt = 0.8 * self.dt + 0.2 * (t - self.t_ant)     # intervalo típico entre quadros
         self.t_ant = t
         bocejo = self._bocejo(t, boca)
-        fechado = p_fech is not None and p_fech >= LIMIAR_OLHO
+        fechado = p_fech is not None and p_fech >= (LIMIAR_OLHO if limiar is None else limiar)
         dur_bruta = self.bruto.passo(t, fechado, self.dt)
         dur_filtrada = self.filtrado.passo(t, fechado and not bocejo, self.dt)
         self.fechado_ha = dur_bruta if fechado else 0.0
@@ -111,12 +163,15 @@ class MaquinaEstados:
     MOSTRAR_ALERTA_S = 4.0   # quanto tempo o aviso rápido fica na tela
     JANELA_MICROS_S = 300.0  # 2 microssonos em 5 min também contam como sonolento
 
-    def __init__(self):
+    def __init__(self, sinal="fusao"):
         self.regra = RegraAlerta()
+        self.sinal = SinalOlho(sinal)
         self.reiniciar()
 
     def reiniciar(self):
         self.regra.reiniciar()
+        self.sinal.reiniciar()
+        self.olho, self.limiar = None, self.sinal.limiar()
         self.sem_rosto_desde = None
         self.nivel_sono = 0                 # 0 normal, 1 atenção, 2 sonolento
         self.sinal_visto_em = None
@@ -125,10 +180,12 @@ class MaquinaEstados:
         self.micros = deque()
         self.eventos = []                   # (t, tipo, detalhe)
 
-    def passo(self, t, linha_ok, p_fech, boca, monitor_estado):
+    def passo(self, t, linha_ok, p_fech, boca, monitor_estado, ear=None):
         """-> dict com o estado do painel e a lista de sons a tocar neste quadro."""
         sons = []
-        novos, info = self.regra.passo(t, p_fech if linha_ok else None, boca if linha_ok else None)
+        olho, limiar = self.sinal.passo(t, p_fech if linha_ok else None, ear if linha_ok else None)
+        self.olho, self.limiar = olho, limiar
+        novos, info = self.regra.passo(t, olho, boca if linha_ok else None, limiar)
         for n in novos:
             self.eventos.append((t, n, f"olho fechado há {info['fechado_ha']:.1f} s"))
             self.alerta_rapido, self.alerta_ate = n, t + self.MOSTRAR_ALERTA_S

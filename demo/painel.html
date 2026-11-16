@@ -143,7 +143,7 @@
         <div class="nota">marcas: 1 s (microssono) e 3 s (sono) · escala até 6 s</div>
       </div>
       <div class="cartao">
-        <div class="rotulo">P(olho fechado), agora</div>
+        <div class="rotulo" id="r_olho">Olho fechado, agora</div>
         <div class="valor" id="p_fech">–</div>
         <div class="barra"><i id="b_pfech"></i><span class="marca" id="m_olho"></span></div>
         <div class="nota" id="boca">boca: –</div>
@@ -292,7 +292,7 @@ function desenharEntradas(e) {
   const s = en.series || [], ref = en.referencia;
   const col = k => s.map(l => l[k]);
   const ult = k => { for (let i = s.length - 1; i >= 0; i--) if (s[i][k] != null) return s[i][k]; return null; };
-  grafico("s0", col(0), { min: 0, max: 1, cor: "#4c8dff", limiar: e.limiar_olho, ref: ref && ref[0] });
+  grafico("s0", col(0), { min: 0, max: 1, cor: "#4c8dff", limiar: e.limiar_yolo ?? e.limiar_olho, ref: ref && ref[0] });
   grafico("s1", col(1), { cor: "#2fbf71", ref: ref && ref[1] });
   grafico("s2", col(2), { cor: "#f2c14e", ref: ref && ref[2] });
   grafico("s3", col(3), { min: -0.05, max: 1.05, cor: "#8b95a3" });
@@ -356,6 +356,7 @@ function desenhar(e) {
   $("b_fechado").style.background = e.fechado_ha >= 3 ? cor("sono") : e.fechado_ha >= 1 ? cor("sonolento") : "var(--azul)";
 
   $("p_fech").textContent = e.p_fech == null ? "sem rosto" : pct(e.p_fech);
+  if (e.sinal_olho) $("r_olho").textContent = "Olho fechado, agora: " + e.sinal_olho;
   largura($("b_pfech"), e.p_fech || 0);
   $("m_olho").style.left = (e.limiar_olho * 100) + "%";
   $("b_pfech").style.background = e.fechado ? cor("microssono") : "var(--azul)";
