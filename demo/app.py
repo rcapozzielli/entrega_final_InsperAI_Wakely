@@ -58,8 +58,9 @@ class Demo:
         self.args = args
         print("Carregando MediaPipe, YOLO e a rede MIL...", flush=True)
         self.extrator = ExtratorRosto()
+        self.i_sorriso = [self.extrator.canais.index(n) for n in ("mouthSmileLeft", "mouthSmileRight")]
         self.monitor = MonitorSonolencia()
-        self.maquina = MaquinaEstados(args.sinal)
+        self.maquina = MaquinaEstados(args.sinal, sorriso=not args.sem_sorriso)
         self.trava = threading.Lock()
         self.estado = {"nivel": "calibrando", "texto": "Iniciando a câmera...", "iniciado": False}
         self.jpeg = None
@@ -194,9 +195,10 @@ class Demo:
             p_fech = num(np.nanmean(linha[:2])) if rosto else None
             boca = num(linha[4]) if rosto else None
             ear = num(np.nanmean(linha[2:4])) if rosto else None
+            sorriso = num(np.nanmean(linha[self.i_sorriso])) if rosto else None
             mon = self.monitor.adicionar(t * 1000, linha)
             with self.trava:
-                est = self.maquina.passo(t, rosto, p_fech, boca, mon, ear)
+                est = self.maquina.passo(t, rosto, p_fech, boca, mon, ear, sorriso)
                 ms = (time.perf_counter() - inicio) * 1000
                 ms_ema = ms if ms_ema is None else 0.9 * ms_ema + 0.1 * ms
                 if t_ant is not None and t > t_ant:
@@ -215,12 +217,15 @@ class Demo:
                     "rosto": rosto, "p_fech": self.maquina.olho, "limiar_olho": self.maquina.limiar, "limiar_yolo": LIMIAR_OLHO,
                     "sinal_olho": self.maquina.sinal.nome(), "boca": boca,
                     "bocejo": est["bocejo"], "fechado": est["fechado"], "fechado_ha": est["fechado_ha"],
+                    "sorriso_val": sorriso, "sorriso": est["sorriso"], "filtro_sorriso": not self.args.sem_sorriso,
                     "micros_5min": est["micros_5min"],
                     "calibrando": mon["calibrando"], "seg_calibrar": num(mon["segundos_para_calibrar"]),
                     "seg_proxima_mil": num(mon["segundos_para_proxima_mil"]), "minutos_mil": mon["minutos_no_saco"],
                     "perclos": num(mon["perclos"]), "limiar_perclos": self.monitor.cfg["limiar_perclos"],
                     "p_mil": num(mon["p_mil"]), "limiar_mil": self.monitor.cfg["limiar_mil"],
                     "p_mil_ultimo": num(mon["p_ultimo_minuto"]), "pesos_mil": lista(mon["pesos_atencao"], 3),
+                    "combinado": num(mon["combinado"]), "limiar_combinado": num(mon["limiar_combinado"]),
+                    "perclos_saco": num(mon["perclos_saco"]), "saco_cheio": mon["saco_cheio"],
                     "minuto_ini_saco": mon["primeiro_minuto_do_saco"],
                     "fps": num(fps_ema), "ms": num(ms_ema),
                     "eventos": [{"t": round(a, 1), "tipo": b, "detalhe": c} for a, b, c in self.maquina.eventos[-8:]][::-1],
@@ -297,6 +302,8 @@ def main():
     ap.add_argument("--rapido", action="store_true", help="com --video, processar o mais rápido possível")
     ap.add_argument("--sinal", choices=["fusao", "yolo"], default="fusao",
                     help="sinal do olho na regra: fusão EAR + YOLO (padrão, limiar 0,35) ou só o YOLO (limiar 0,4)")
+    ap.add_argument("--sem-sorriso", action="store_true",
+                    help="desligar o filtro de sorriso (seção 11.5): olho fechado sorrindo volta a contar para o microssono")
     ap.add_argument("--porta", type=int, default=8765)
     ap.add_argument("--log", help="arquivo CSV para registrar só os eventos (sem vídeo)")
     ap.add_argument("--sem-video", action="store_true", help="não mostrar a imagem da câmera no painel")

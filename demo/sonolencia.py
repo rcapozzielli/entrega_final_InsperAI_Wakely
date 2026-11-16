@@ -28,6 +28,7 @@ Uso:
         linha = extrator.linha(bgr)
         estado = monitor.adicionar(time.monotonic() * 1000, linha)
 """
+import json
 import math
 import os
 import warnings
@@ -301,9 +302,13 @@ class ModeloMIL:
 class MonitorSonolencia:
     """Recebe (tempo em ms, linha de 61 sinais) a cada quadro e mantém o estado de sonolência."""
 
-    def __init__(self, arq=PASTA_MODELOS / "mil_gru4_uta.pt", max_minutos=9, max_buraco_ms=250):
+    def __init__(self, arq=PASTA_MODELOS / "mil_gru4_uta.pt", max_minutos=9, max_buraco_ms=250,
+                 arq_combinado=PASTA_MODELOS / "combinado_uta.json"):
         self.mil = ModeloMIL(arq)
         self.cfg = self.mil.cfg
+        # modelo final de sonolência (seção 12): padronização e limiar do UTA, gravados pela seção 12 do notebook
+        self.comb = json.load(open(arq_combinado, encoding="utf-8")) if Path(arq_combinado).exists() else None
+        self.i_perclos = list(self.cfg["atributos"]).index("PERCLOS")
         self.passo = 1000.0 / self.cfg["fps"]
         self.n = self.cfg["amostras_minuto"]
         self.max_minutos, self.max_buraco = max_minutos, max_buraco_ms
@@ -319,6 +324,8 @@ class MonitorSonolencia:
         self.primeiro_do_saco = None                     # número do minuto mais antigo do saco (1 = calibração)
         self.ref_canais = None                          # mediana do 1º minuto (P(fechado), EAR, boca), para o painel
         self.atrib_cal = self.atrib_ultimo = None        # 16 atributos do 1º minuto e do último minuto completo
+        self.perclos_min = []                            # PERCLOS de cada minuto completo (o 1º é a calibração)
+        self.perclos_saco = self.combinado = None        # PERCLOS médio dos minutos do saco e PERCLOS combinado
 
     def _sem_rosto(self):
         s = np.full(len(self.cfg["canais_rico"]), np.nan, np.float32)
@@ -342,6 +349,7 @@ class MonitorSonolencia:
         if len(self.amostras) == self.n:
             self.minutos.append(np.stack(self.amostras))
             self.amostras = []
+            self.perclos_min.append(float(atributos_minuto(self.minutos[-1], self.cfg)[self.i_perclos]))
             # só para mostrar no painel; a MIL refaz essas contas em ModeloMIL.entradas
             if len(self.minutos) == 1:
                 self.ref_canais = ModeloMIL.referencia(self.minutos[0])
@@ -354,6 +362,22 @@ class MonitorSonolencia:
                 self.primeiro_do_saco = len(self.minutos) - len(saco) + 1
                 # o saco "lembra" o minuto mais sonolento; o último minuto sozinho mostra como a pessoa está agora
                 self.p_ultimo = self.p_mil if len(saco) == 1 else self.mil.prever(self.minutos[0], saco[-1:])[0]
+                self._combinar(len(saco))
+
+    def _combinar(self, n_saco):
+        """PERCLOS combinado da seção 12: média do PERCLOS absoluto (média dos minutos do saco, como o PERCLOS por
+        vídeo do notebook, que usa os minutos depois da calibração) e do logit da MIL, cada um padronizado no UTA."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            pa = float(np.nanmean(self.perclos_min[1:][-n_saco:]))
+        self.perclos_saco = None if np.isnan(pa) else pa
+        if self.comb is None or self.perclos_saco is None or self.p_mil is None:
+            self.combinado = None
+            return
+        p = min(max(float(self.p_mil), 1e-6), 1 - 1e-6)
+        c = self.comb
+        self.combinado = ((pa - c["mu_perclos"]) / c["dp_perclos"]
+                          + (math.log(p / (1 - p)) - c["mu_logit"]) / c["dp_logit"]) / 2
 
     def perclos(self):
         if len(self.ultimas) < self.n:
@@ -370,11 +394,16 @@ class MonitorSonolencia:
                 "segundos_para_calibrar": 0.0 if self.minutos else (self.n - len(self.amostras)) / self.cfg["fps"],
                 "segundos_para_proxima_mil": (self.n - len(self.amostras)) / self.cfg["fps"],
                 "minutos_no_saco": max(0, min(len(self.minutos) - 1, self.max_minutos)),
+                "saco_cheio": len(self.minutos) - 1 >= self.max_minutos,
                 "perclos": per,
                 "perclos_alto": None if per is None else per >= self.cfg["limiar_perclos"],
                 "p_mil": self.p_mil,
                 "sonolento_mil": None if self.p_mil is None else self.p_mil >= self.cfg["limiar_mil"],
                 "pesos_atencao": self.pesos,
+                "perclos_saco": self.perclos_saco,
+                "combinado": self.combinado,
+                "limiar_combinado": None if self.comb is None else self.comb["limiar"],
+                "sonolento_comb": None if self.combinado is None else self.combinado >= self.comb["limiar"],
                 "p_ultimo_minuto": self.p_ultimo,
                 "primeiro_minuto_do_saco": self.primeiro_do_saco}
 

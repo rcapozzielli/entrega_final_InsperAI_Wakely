@@ -58,6 +58,10 @@
   button:hover { border-color: var(--azul); }
   button.ativo { background: var(--azul); border-color: var(--azul); }
   .pilula { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; background: #222935; }
+  /* filtros da regra de microssono: âmbar quando seguram o alarme, apagado quando desligados */
+  #filtros { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .pilula.segurando { background: #f0b428; color: #14171c; font-weight: 600; }
+  .pilula.desligado { opacity: 0.5; text-decoration: line-through; }
   footer { color: var(--suave); text-align: center; font-size: 13px; padding: 4px 22px 22px; }
   /* pesos da atenção da MIL, um por minuto do saco */
   #pesos { display: flex; align-items: flex-end; gap: 4px; height: 44px; margin-top: 8px; }
@@ -147,6 +151,7 @@
         <div class="valor" id="p_fech">–</div>
         <div class="barra"><i id="b_pfech"></i><span class="marca" id="m_olho"></span></div>
         <div class="nota" id="boca">boca: –</div>
+        <div class="nota" id="filtros"></div>
       </div>
     </div>
 
@@ -158,10 +163,12 @@
         <div class="nota" id="n_perclos">fração do minuto com olho fechado · sem treino</div>
       </div>
       <div class="cartao">
-        <div class="rotulo">Sonolência pela rede MIL (minutos desde a calibração)</div>
+        <div class="rotulo">Sonolência · Wakely-MIL</div>
         <div class="valor" id="mil">–</div>
-        <div class="barra"><i id="b_mil"></i><span class="marca" style="left:50%"></span></div>
-        <div class="nota" id="n_mil">deep learning · compara com o seu 1º minuto</div>
+        <div class="barra"><i id="b_mil"></i><span class="marca" id="m_comb" style="left:50%"></span></div>
+        <div class="nota">rede MIL-GRU (deep learning) + PERCLOS, treinada no UTA-RLDD</div>
+        <div class="nota" id="n_mil"></div>
+        <div class="nota" id="partes"></div>
         <div class="nota" id="mil_ultimo"></div>
         <div id="pesos" title="peso da atenção de cada minuto no saco"></div>
         <div class="nota" id="n_pesos"></div>
@@ -360,8 +367,14 @@ function desenhar(e) {
   largura($("b_pfech"), e.p_fech || 0);
   $("m_olho").style.left = (e.limiar_olho * 100) + "%";
   $("b_pfech").style.background = e.fechado ? cor("microssono") : "var(--azul)";
-  $("boca").innerHTML = e.boca == null ? "boca: –" :
-    `boca: ${e.boca.toFixed(2).replace(".", ",")} ${e.bocejo ? '<span class="pilula">bocejo: olho fechado não conta para o microssono</span>' : ""}`;
+  const num2 = v => v == null ? "–" : v.toFixed(2).replace(".", ",");
+  $("boca").textContent = `boca: ${num2(e.boca)} · sorriso: ${num2(e.sorriso_val)}`;
+  // filtros da regra: olho fechado durante bocejo ou sorriso não conta para o microssono (o piso de 3 s continua)
+  const filtro = (nome, ativo, ligado) => !ligado
+    ? `<span class="pilula desligado">filtro de ${nome}: desligado</span>`
+    : ativo ? `<span class="pilula segurando">${nome} detectado: olho fechado não conta</span>`
+            : `<span class="pilula">filtro de ${nome}: pronto</span>`;
+  $("filtros").innerHTML = filtro("bocejo", e.bocejo, true) + filtro("sorriso", e.sorriso, e.filtro_sorriso !== false);
 
   if (e.perclos == null) { $("perclos").textContent = "aguardando 1 min"; largura($("b_perclos"), 0); }
   else {
@@ -372,12 +385,26 @@ function desenhar(e) {
   $("m_perclos").style.left = (e.limiar_perclos / 0.2 * 100) + "%";
   $("n_perclos").textContent = `limiar ${pct(e.limiar_perclos)} (escolhido no UTA-RLDD) · escala até 20% · sem treino`;
 
-  if (e.p_mil == null) { $("mil").textContent = e.calibrando ? "calibrando" : "aguardando 1 min"; largura($("b_mil"), 0); }
-  else {
-    $("mil").textContent = pct(e.p_mil);
+  // modelo final (seção 12): escore padronizado no UTA; a barra vai de -2 a +2 e a marca é o limiar do UTA
+  const esc = z => Math.min(1, Math.max(0, (z + 2) / 4));
+  if (e.p_mil == null) {
+    $("mil").textContent = e.calibrando ? "calibrando" : "aguardando 1 min"; largura($("b_mil"), 0); $("partes").textContent = "";
+  } else if (e.combinado == null) {   // sem data/modelos/combinado_uta.json: mostra só a MIL
+    $("mil").textContent = "MIL " + pct(e.p_mil);
     largura($("b_mil"), e.p_mil);
     $("b_mil").style.background = e.p_mil >= e.limiar_mil ? cor("atencao") : cor("normal");
+    $("partes").textContent = "constantes do modelo final não encontradas: rode a seção 12 do notebook";
+  } else {
+    const acima = e.combinado >= e.limiar_combinado;
+    $("mil").textContent = (acima ? "sonolento" : "alerta") + " · " + (e.combinado >= 0 ? "+" : "") + fmt(e.combinado, 2);
+    largura($("b_mil"), esc(e.combinado));
+    $("m_comb").style.left = (esc(e.limiar_combinado) * 100) + "%";
+    $("b_mil").style.background = acima ? cor("atencao") : cor("normal");
+    $("partes").textContent = `partes: PERCLOS dos ${e.minutos_mil} min ${pct(e.perclos_saco)} · MIL ${pct(e.p_mil)}`;
   }
+  $("n_mil").textContent = e.p_mil != null && !e.saco_cheio
+    ? `${e.minutos_mil} min analisados · o acerto sobe com os minutos e fica confiável perto de 10 (seção 12.2)`
+    : e.p_mil != null ? `${e.minutos_mil} min analisados` : "";
   // o saco "lembra" o minuto mais sonolento; o último minuto sozinho e a atenção mostram de onde vem a P
   const pesos = e.pesos_mil || [];
   if (e.p_mil == null || !pesos.length) {
