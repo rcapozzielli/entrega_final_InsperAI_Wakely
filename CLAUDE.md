@@ -2,7 +2,7 @@
 
 Protótipo acadêmico da Insper AI que detecta sonolência ao volante com câmera e deep learning. **Não é um dispositivo de segurança e nunca deve ser testado dirigindo.**
 
-Este arquivo resume o estado do projeto em 07/11/2026, depois das seções 8.5 a 8.7 (entrada rica, análise de erros e MIL com validação externa no DROZY, branch `feat/modelo-temporal`). A pesquisa completa está em `docs/pesquisa_wakely.md`, e o código e os resultados, em `wakely.ipynb`.
+Este arquivo resume o estado do projeto em 14/11/2026, depois da seção 12 (modelo final de sonolência em 4 bases, branch `feat/pos-intermediaria`). As seções 8.5 a 8.7 (entrada rica, análise de erros e MIL com validação externa no DROZY) são de 07/11. A pesquisa completa está em `docs/pesquisa_wakely.md`, e o código e os resultados, em `wakely.ipynb`.
 
 Prazos: apresentação intermediária em 12/11/2026, entrega final (notebook e paper) em 17/11/2026 e apresentação final em 18/11/2026.
 
@@ -20,6 +20,8 @@ uv run jupyter nbconvert --to notebook --execute --inplace wakely.ipynb --Execut
 - A seção 8 baixa a pasta `len60` do UTA-RLDD (1,2 GB) e extrai os sinais em cerca de 2,5 h na CPU de um Apple M5, com cache por pessoa em `data/cache/rldd/`. Como as pessoas são independentes, a extração foi rodada em 4 processos com `extrair_pessoa`. As previsões da GRU e da TCN ficam em `data/cache/rldd_temporal/`. Apague essas pastas para refazer.
 - A seção 8.5 refaz a extração com pose da cabeça e os 52 blendshapes em `data/cache/rldd_rico/` (160 MB). Ela levou cerca de 45 min em 4 processos numa RTX 3050 e leva cerca de 2 h num processo só. Mais de 4 processos estouram os 6 GB da GPU. As previsões das redes da seção 8.5 ficam em `data/cache/rldd_rico_temporal/`.
 - A seção 8.7 baixa o DROZY (2,5 GB, ORBi) para `data/drozy/` e extrai os sinais em `data/cache/drozy_rico/`, o que levou 20 min em 4 processos (cerca de 1 h num só). As previsões ficam em `data/cache/rldd_mil/` (parte A) e `data/cache/drozy_mil/` (parte B). O treino das redes MIL leva segundos por semente.
+- A seção 12 usa os sinais da SUST-DDD em `data/cache/sust_rico/` (2.074 clipes) e as previsões em `data/cache/sust_mil/`. A 12.2 usa os sinais da UL-DD em `data/cache/uldd_rico/` (29 sessões, extraídos **fora do notebook** pelo método do DROZY, cerca de 80 min em 4 processos) e as previsões em `data/cache/uldd_mil/`. A UL-DD bruta fica em `data/bases_novas/ul_dd/`.
+- **Memória:** o notebook inteiro passa dos 15,7 GB de RAM do Rafael e usa memória virtual. Se rodar como processo em segundo plano do Claude Code, ele é interrompido por falta de memória. Rode num terminal separado, ou use a execução parcial (seções 1 a 8.7 e 12, sem a 7), que em 14/11 reproduziu as saídas da 12 e da 12.1. A célula de carga da UL-DD (12.2) sozinha ocupa cerca de 3,7 GB e deve ser aliviada antes da execução final.
 
 ## Pipeline atual
 
@@ -31,11 +33,12 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 - **Agente de RL (seção 7):** é um experimento. Ele não supera a regra e não faz parte do pipeline.
 - **Modelo temporal (seção 8):** GRU, TCN e transformer sobre 1 minuto de sinais, no UTA-RLDD, também com cabeça e expressões (8.5). Nenhum supera o PERCLOS do minuto.
 - **Rede MIL (seção 8.7):** cada vídeo é normalizado pelo seu 1º minuto, e o vídeo vira um saco de minutos com atenção. Ela supera a logística com os mesmos sinais no UTA e no DROZY. A demo mostra lado a lado a MIL, com calibração no 1º minuto de uso, e o PERCLOS do último minuto.
+- **Modelo final de sonolência (seção 12):** PERCLOS combinado = média do PERCLOS absoluto e do logit da MIL-GRU-4 (média das 5 sementes), cada um padronizado com a média e o desvio do UTA, com peso fixo de ½. A demo ainda não calcula o combinado: mostra as duas partes separadas.
 - **`demo/sonolencia.py`:** módulo da demo, sem depender do notebook.
   - `ExtratorRosto` dá a mesma linha de 61 sinais da extração da seção 8.5 (conferido num clipe do UTA: diferença máxima de 0,001 no P(fechado) e zero no resto).
   - `MonitorSonolencia` reamostra para 10 fps, calibra no 1º minuto e, a cada minuto completo, dá o PERCLOS e a P(sonolento) da MIL (média das 5 sementes, saco com os últimos 9 minutos). No DROZY, reproduz as previsões da parte B.
   - Os pesos ficam em `data/modelos/mil_gru4_uta.pt` (148 KB, fora do Git), gravados pela última célula da seção 8.7.
-- **Demo com webcam (`demo/app.py`, 08/11/2026):** webcam do notebook → `ExtratorRosto` → regra de `demo/alerta.py` (YOLO, T = 1 s, filtro de bocejo, piso de 3 s e 6 s) + `MonitorSonolencia` (PERCLOS e MIL) → máquina de estados → painel no navegador (`demo/painel.html`, em http://localhost:8765), com o rosto espelhado, sons e as teclas F (alarme falso, só registra), R (recalibrar) e P (o que aparece por cima do vídeo: contornos, entradas da MIL ou vídeo limpo; `--pontos` escolhe o modo inicial). O cartão "Entradas da MIL" mostra os 4 sinais por quadro do último minuto, com a referência do 1º minuto, e os 16 atributos do 1º e do último minuto completo (10/11/2026). O cartão da MIL mostra também a P do último minuto sozinho e o peso da atenção de cada minuto do saco: o saco "lembra" o minuto mais sonolento, então a P da MIL fica alta mesmo quando a pessoa melhora (no vídeo da pessoa 48 do UTA, 94% no minuto 7, contra 51% do minuto sozinho). Rode da raiz do repositório: `uv run python demo/app.py` (`--camera 1` para outra câmera, `--video arquivo.mp4` para testar com vídeo, `--log eventos.csv` para registrar só os eventos). A regra ao vivo repete a do notebook nos 44 vídeos do FL3D (163 de 163 avisos de microssono, 12 de 12 do piso). Os tempos da máquina de estados (10 s sem rosto, 60 s de histerese, 5 min entre avisos de sonolência) são escolhas da demo e não foram validados. A demo ainda usa só o YOLO, sem a fusão da seção 6.3.
+- **Demo com webcam (`demo/app.py`, 08/11/2026):** webcam do notebook → `ExtratorRosto` → regra de `demo/alerta.py` (YOLO, T = 1 s, filtro de bocejo, piso de 3 s e 6 s) + `MonitorSonolencia` (PERCLOS e MIL) → máquina de estados → painel no navegador (`demo/painel.html`, em http://localhost:8765), com o rosto espelhado, sons e as teclas F (alarme falso, só registra), R (recalibrar) e P (o que aparece por cima do vídeo: contornos, entradas da MIL ou vídeo limpo; `--pontos` escolhe o modo inicial). O cartão "Entradas da MIL" mostra os 4 sinais por quadro do último minuto, com a referência do 1º minuto, e os 16 atributos do 1º e do último minuto completo (10/11/2026). O cartão da MIL mostra também a P do último minuto sozinho e o peso da atenção de cada minuto do saco: o saco "lembra" o minuto mais sonolento, então a P da MIL fica alta mesmo quando a pessoa melhora (no vídeo da pessoa 48 do UTA, 94% no minuto 7, contra 51% do minuto sozinho). Rode da raiz do repositório: `uv run python demo/app.py` (`--camera 1` para outra câmera, `--video arquivo.mp4` para testar com vídeo, `--log eventos.csv` para registrar só os eventos). A regra ao vivo repete a do notebook nos 44 vídeos do FL3D (163 de 163 avisos de microssono, 12 de 12 do piso). Os tempos da máquina de estados (10 s sem rosto, 60 s de histerese, 5 min entre avisos de sonolência) são escolhas da demo e não foram validados. Desde 14/11/2026, a demo usa a **fusão pela média** da seção 6.3 (limiar 0,35, `--sinal yolo` volta ao YOLO com 0,4), que passou na condição 2 da 10.4 (ver `docs/registro_antonio_13-11.md` na branch `feat/laya-e-testes`). Nos primeiros 30 s com rosto, enquanto mede a referência do EAR, ela usa o YOLO sozinho; depois disso dá os mesmos alarmes da fusão offline nos 44 vídeos do FL3D e nos 8 do Eyeblink8.
 
 ## Estrutura do notebook
 
@@ -50,8 +53,11 @@ Webcam → MediaPipe → P(olho fechado) ou EAR → filtro de bocejo → regra d
 | 7 | Agente de RL no alerta: Q-learning com tabela, curva por λ, tecla "foi alarme falso" e mapa da política |
 | 8 | Modelo temporal no UTA-RLDD: extração (8.1), análise inicial e falsos alarmes (8.2), PERCLOS e logística (8.3), GRU e TCN (8.4), cabeça, expressões e transformer (8.5), análise de erros (8.6), MIL com normalização pelo 1º minuto e validação externa no DROZY (8.7) |
 | 9 | Resumo e próximos passos |
+| 10 | Feedback da entrega intermediária (12/11) e plano de ação até 17/11, só texto. A lista de bases buscadas está em `docs/bases_candidatas.md`. A 10.4 registra os critérios dos modelos finais e a mudança do critério de sonolência |
+| 11 | Reservada para o modelo final de microssono (fusão × YOLO, condição 2 da 10.4), que espera a extração e os resultados do Antônio |
+| 12 | Modelo final de sonolência: critério em UTA, DROZY e SUST-DDD (12), análise de erros na SUST-DDD (12.1) e UL-DD como 4ª base, com fine-tuning e hipóteses H1 a H3 (12.2) |
 
-Funções principais: `fechamento`, `bocejo_ativo`, `alertas` e `avaliar_eventos` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2), `rodar_agente`, `rodar_regra` e `treinar_agente` (seção 7), `extrair_pessoa`, `atributos`, `avisos_regra`, `metricas_8` e `prever_temporal` (seção 8), `extrair_pessoa_rico`, `carregar_rico`, `treinar_85`, `prever_85` e `auc_dentro_da_pessoa` (seções 8.5 e 8.6), `normalizar_videos`, `MILSono`, `treinar_87`, `prever_87`, `extrair_drozy` e `prever_b` (seção 8.7). A última célula da seção 8.7 grava os pesos da MIL para a demo.
+Funções principais: `fechamento`, `bocejo_ativo`, `alertas`, `avaliar_eventos`, `f_beta` e `metricas_f` (seção 2), `treinar` e `prever` (seção 3), `contagens` e `deixar_um_video_de_fora` (seção 4.2), `rodar_agente`, `rodar_regra` e `treinar_agente` (seção 7), `extrair_pessoa`, `atributos`, `avisos_regra`, `metricas_8` e `prever_temporal` (seção 8), `extrair_pessoa_rico`, `carregar_rico`, `treinar_85`, `prever_85` e `auc_dentro_da_pessoa` (seções 8.5 e 8.6), `normalizar_videos`, `MILSono`, `treinar_87`, `prever_87`, `extrair_drozy` e `prever_b` (seção 8.7). A última célula da seção 8.7 grava os pesos da MIL para a demo.
 
 As saídas gravadas vêm de uma execução completa na RTX 3050 do Rafael, em 07/11/2026, que incluiu as seções 8.5 a 8.7. As seções 1 a 6 reproduziram as saídas originais, e a seção 7 mudou nos números do YOLO (veja Resultados). A seção 8 usa os caches `rldd/` e `rldd_temporal/` gerados pela Luana na CPU de um Apple M5, com os pesos do YOLO da semente 42 do Rafael. Isso foi conferido em 2 clipes: o P(fechado) do cache tem correlação de 0,99 com essa semente, contra 0,72 a 0,87 com as sementes 1 e 2. A diferença que sobra deve vir do MediaPipe em Mac e em Windows, então uma extração nova deve ser feita toda numa máquina só. Numa execução completa no M5, as seções 3 a 6 mudaram um pouco (por exemplo, os falsos alarmes do YOLO com filtro foram de 10,2 para 9,4), porque CPU e GPU arredondam as contas de forma diferente.
 
@@ -64,6 +70,8 @@ As saídas gravadas vêm de uma execução completa na RTX 3050 do Rafael, em 07
 | NITYMED | Vídeos originais do FL3D, usados para recolocar os frames removidos |
 | UTA-RLDD recortado | Seção 8: só a pasta `len60`, com 1.136 clipes de 1 min a 10 fps, de 60 pessoas, alertas ou sonolentas (falta a sonolenta da pessoa 42). Os clipes de cada vídeo são minutos seguidos, e os 10 com menos de 600 frames são o último de cada vídeo |
 | DROZY | Seção 8.7, validação externa: 14 pessoas, 36 testes de reação de 10 min com privação de sono crescente (descansado, ~18 h e ~28 h acordado), câmera infravermelha. Rótulo: KSS ≥ 7. Licença só para pesquisa, sem redistribuir e sem mostrar as imagens; citar Massoz et al., WACV 2016 |
+| SUST-DDD | Seção 12, teste: 19 motoristas em direção real, gravando com o celular, clipes de 10 s marcados por observadores. Motoristas agrupados à mão em `data/cache/sust/motoristas.csv`. Entram as 34 sequências de 2 min ou mais. Licença dos vídeos não informada: nenhuma imagem |
+| UL-DD | Seção 12.2, teste: 16 pessoas num simulador, sessão alerta e sonolenta de 40 min, vídeo infravermelho, KSS a cada 4 min; 29 sessões com vídeo. Rótulo: mediana dos 10 KSS ≥ 7. **Acesso pessoal do Rafael:** os dados ficam só no disco dele, fora do Git, sem ir para o Colab, o grupo ou serviços externos. Nenhuma imagem até ler o acordo de uso inteiro. Citar "A multimodal drowsiness dataset using video, biometric, and behavioral data" |
 
 ## Decisões
 
@@ -75,10 +83,13 @@ As saídas gravadas vêm de uma execução completa na RTX 3050 do Rafael, em 07
 - **YOLO detector e SAM 2 estão fora do pipeline.** A pergunta sobre isso à organização ainda está em aberto.
 - **Agente de RL fica como experimento.** A demo usa a regra (YOLO, T = 1 s, filtro de bocejo), e a sugestão é somar o piso de 3 s.
 - **Modelo temporal:** janela de 60 s, entradas P(fechado), EAR, boca e rosto, e YOLO da semente 42. Os atributos da seção 8.2 e os hiperparâmetros da GRU e da TCN foram fixados antes de ver os resultados e não devem ser ajustados olhando as dobras de teste.
+- **Limiar de olho escolhido pelo F1, não pelo F2** (13/11/2026). O FL3D não tem piscadas e tem muitos microssonos, então escolher pelo F2 puxaria o limiar para baixo e subestimaria os alarmes numa viagem. A escolha pelo F2 só com protocolo próprio e uma base com alarmes falsos reais (classe alerta do UTA, Eyeblink8, Drive&Act).
+- **Critério do sistema final de microssono (seção 10.4, aprovado pelo grupo em 13/11/2026, antes de medir as bases de teste):** fica o candidato com maior F2 na validação cruzada do FL3D, se (1) a diferença de F2 contra o sistema atual (YOLO com filtro) tiver IC95% sem zero e (2) a taxa de alarmes falsos somando todas as bases de teste (classe alerta do UTA, Eyeblink8 e Drive&Act; alarmes ÷ horas) não for maior que a do sistema atual. Cada base é reportada separada, e uma piora isolada entra como limitação. A fusão pela média já passa na condição 1; a condição 2 falta medir.
 - **Linha de base por pessoa:** não dá para avaliar no UTA-RLDD (seção 8.6), porque cada classe foi gravada num dia. Fica para uma base com os dois estados na mesma sessão ou para as gravações do grupo, só como teste.
 - **Seção 8.5 com protocolo fixado antes** (`docs/protocolo_8_5.md`, aprovado em 07/11/2026). Canais, atributos, modelos e hiperparâmetros não mudam olhando as dobras de teste. Qualquer teste novo nessa base entra como exploratório.
 - **A seção 8.6 é exploratória.** Ela usa previsões de teste e não pode orientar ajustes nos modelos das seções 8.3 a 8.5.
 - **Seção 8.7 com protocolo fixado antes** (`docs/protocolo_8_7.md`, aprovado em 07/11/2026, antes de treinar e de extrair o DROZY). A rede principal é a MIL-GRU-4 híbrida, e a linha de base principal, a Logística-Δ16. O critério é IC acima de zero no UTA e diferença positiva no DROZY. O DROZY é só teste: nada é treinado, calibrado ou escolhido nele. O MIL-Transformer, que foi o melhor, era secundário, e só um teste novo pode confirmá-lo.
+- **Modelo final de sonolência (seção 12, `docs/protocolo_sonolencia_final.md`, aprovado em 13/11/2026):** critério em dois níveis. (1) Escolha: maior AUC média nas bases (UTA, DROZY, SUST-DDD e, pela emenda de 13/11, UL-DD), sem nenhuma base com IC95% todo abaixo de zero contra o PERCLOS absoluto; empate fica com o PERCLOS. (2) Afirmação: "supera o PERCLOS" só com IC95% acima de zero na média das diferenças nas bases novas (SUST-DDD e UL-DD). O critério foi trocado depois de ver o UTA e o DROZY, o que favorece quem já ia bem nelas, e isso está registrado na 10.4. A MIL-GRU-4 sozinha é só descrição (perde no UTA). Fine-tuning, hipóteses H1 a H3 e a Laya são exploratórios. Nada é treinado, calibrado ou escolhido nas bases de teste, e o que o Antônio vir nelas não pode orientar ajustes.
 
 ## Resultados
 
@@ -90,6 +101,7 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 | MobileNetV3-Small | 73,5% | 41 | 76,0% | 18 |
 | YOLO26n-cls | 84,5% | 33 | 86,8% | 10 |
 
+- **Precisão por alarme, F1 e F2 (frente B, `docs/protocolo_metricas_f.md`, aprovado e rodado em 13/11/2026):** precisão = acertos / (acertos + falsos), F2 com β = 2. O limiar continua escolhido pelo F1, e o F2 só é reportado. Com filtro: EAR F1 0,88 e F2 0,86; MobileNet 0,81 e 0,78; YOLO 0,90 e 0,88; fusão pela média 0,93 e 0,92. Sem filtro: EAR 0,78 e 0,79; MobileNet 0,74 e 0,74; YOLO 0,83 e 0,84. O filtro melhora F1 e F2 nos três sinais (IC sem zero). O YOLO supera a MobileNet em F2 (+0,100, de +0,038 a +0,178, com filtro), mas não o EAR. A fusão pela média ganha do YOLO em F2 (+0,037, de +0,010 a +0,071). No FL3D a precisão é alta porque há muitos microssonos, então esses números comparam sinais e não descrevem uma viagem.
 - **Classificadores:** o YOLO supera a MobileNet em recall, com filtro (+10,8 pontos, intervalo de +3,5 a +19,8). Ele não supera o EAR de forma conclusiva (+1,3 pontos, intervalo de -7,5 a +13,7).
 - **No MRL, em 8 pessoas novas:** acurácia de 97,7% no YOLO e 96,8% na MobileNet.
 - **Filtro:** com o mesmo limiar de olho, não perdeu microssonos na calibração. Parte do ganho de recall vem de um limiar mais baixo, que também aumenta os alarmes fora de bocejo.
@@ -115,6 +127,13 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
     - controle de pose 0,641, então os resultados devem ser lidos com cautela.
   - **Extração no DROZY:** o rosto foi achado em 99,8% dos frames.
   - **Checagem de vazamento:** com os rótulos embaralhados dentro da pessoa, a AUC fica entre 0,49 e 0,61.
+- **Modelo final de sonolência (seção 12, AUC por vídeo ou sequência, redes treinadas só no UTA, 5 sementes):**
+  - **AUC em UTA / DROZY / SUST-DDD / UL-DD (média):** PERCLOS absoluto 0,814 / 0,619 / 0,627 / 0,763 (0,706); MIL-Transformer 0,875 / 0,743 / 0,484 / 0,677 (0,695); **PERCLOS combinado 0,804 / 0,711 / 0,704 / 0,747 (0,742)**; PERCLOS adaptativo 0,814 / 0,619 / 0,632 / 0,773 (0,710); MIL-GRU-4 (descrição) 0,742 / 0,708 / 0,679 / 0,706 (0,709).
+  - **Nível 1:** PERCLOS combinado. **Nível 2:** não confirmado (+0,031, de −0,134 a +0,153 nas bases novas).
+  - **PERCLOS adaptativo:** b mediano 0 no UTA, no DROZY e na SUST-DDD (o YOLO dá P(fechado) ≈ 0 no olho aberto), então é quase igual ao absoluto. Na UL-DD, +0,010 (de 0,000 a +0,037).
+  - **SUST-DDD:** 34 sequências (14 sonolentas, 15 motoristas), rosto em 98,8%, controle de pose 0,639. **UL-DD:** 29 sessões de 16 pessoas (11 sonolentas), rosto em 99,93%.
+  - **12.1 (exploratória):** o PERCLOS sobe 0,006 do alerta ao sonolento na mesma pessoa e varia 0,009 entre motoristas; o EAR de olho aberto sozinho dá 0,393; brilho 0,714 e pitch médio 0,289 separam as classes (gravação diferente); o desvio do yaw é 2,1 vezes o do UTA; com 1 minuto avaliado, nenhum candidato passa de 46% de acerto, e com 3 ou mais o combinado chega a 82%.
+  - **12.2 (exploratória):** o fine-tuning com a SUST-DDD não ajuda na UL-DD (GRU −0,064, Transformer −0,002, combinado −0,040). H1 confirmada: o combinado vai de 0,485 com 1 minuto a 0,773 com 10, e o PERCLOS já dá 0,720 com 3. H2 confirmada: na UL-DD o giro da cabeça é como no UTA, e o Transformer perde menos (−0,086), mas ainda perde. H3 confirmada: dentro da pessoa, o PERCLOS acerta 11 de 11 pessoas na UL-DD, contra 0,763 entre pessoas.
 
 ## Cuidados
 
@@ -143,11 +162,13 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 
 ## Próximos passos
 
-1. **Deep learning na sonolência, depois da seção 8.7:** a MIL normalizada pelo 1º minuto entra na demo, ao lado do PERCLOS (`demo/sonolencia.py`). Falta:
-   - testar a MIL-Transformer, que foi a melhor, num protocolo novo;
-   - atacar o custo da normalização, que tira o sono de quem já começa sonolento.
+1. **Sonolência, depois da seção 12:** o modelo final é o PERCLOS combinado. O MIL-Transformer foi testado no protocolo novo e caiu na SUST-DDD. Falta:
+   - decidir se a demo passa a mostrar o combinado (precisa de cerca de 10 minutos de uso);
+   - linha de base por pessoa, como calibrar na sessão alerta da mesma pessoa (exploratório futuro no protocolo), porque o erro vem da diferença entre pessoas;
+   - revisar o rascunho do limiar adaptativo (`docs/protocolo_limiar_adaptativo.md`), já que b ≈ 0 nas bases.
+   - **Microssono (seção 11):** fechar fusão × YOLO quando chegar a extração do Antônio; depois, fine-tuning do YOLO com aumento (frente J) e limiar adaptativo, sempre contra o vencedor.
 2. **Demo com webcam (para 12/11): feita** (`demo/app.py`). Falta medir FPS na máquina da apresentação (12 a 19 quadros/s na webcam de uma RTX 4060) e ensaiar com pelo menos 2 minutos de câmera, para a MIL aparecer. O aviso de sonolência usa o `MonitorSonolencia` de `demo/sonolencia.py` (MIL e PERCLOS), e o `ExtratorRosto` também entrega o P(fechado) e a boca da regra, com um MediaPipe só por quadro. A webcam precisa de pelo menos 10 fps.
-3. **Fusão na demo:** trocar o P(fechado) do YOLO pela média com o EAR (limiar 0,35, referência do EAR no começo do uso) e confirmar a fusão numa base com microssonos marcados além do FL3D.
+3. **Fusão na demo: feita em 14/11** (`demo/alerta.py`, `SinalOlho`). Na BINUS, a fusão e o YOLO acham só ~30% dos microssonos de 1 s ou mais (branch `feat/laya-e-testes`), o que entra como limitação.
 4. **Falsos alarmes em situações difíceis:** gravações encenadas do grupo, só como teste, com conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.
 5. **Piso de 3 s na regra principal:** levar o piso da seção 7 para a seção 6 e conferir os números.
 6. **Linha de base por pessoa (próxima etapa):** começo do uso como referência, contra o viés do olho pequeno. Avaliar fora do UTA-RLDD (seção 8.6).
@@ -155,7 +176,8 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 ## Pontos fracos atuais
 
 - **Sonolência antes do microssono:** no UTA, o PERCLOS absoluto ainda é o melhor sinal simples (0,77 por minuto e 0,81 por vídeo). O rótulo do UTA-RLDD é autorrelatado, vale para o vídeo inteiro e mistura o sono com o dia da gravação.
-- **Deep learning na sonolência ainda frágil:** a MIL supera a logística com os mesmos sinais no UTA e no DROZY, mas não o PERCLOS absoluto no UTA. O DROZY tem só 14 pessoas, e a iluminação também muda entre os testes. A atenção não acrescenta nada à média simples dos minutos.
+- **Deep learning na sonolência ainda frágil:** a MIL supera a logística com os mesmos sinais no UTA e no DROZY, mas não o PERCLOS absoluto no UTA. O DROZY tem só 14 pessoas, e a iluminação também muda entre os testes. A atenção não acrescenta nada à média simples dos minutos. Na seção 12, o PERCLOS combinado com a MIL é o melhor em média nas 4 bases, mas não supera o PERCLOS de forma confirmada nas bases novas, e as bases novas são pequenas (34 sequências e 29 sessões).
+- **Diferença entre pessoas:** dentro da mesma pessoa, o PERCLOS separa o sono quase sem erro; entre pessoas, o tamanho do olho, a câmera e a luz derrubam o acerto (seções 8.6, 12.1 e 12.2).
 - **Teste pequeno:** o holdout tem 2 vídeos com microssono, e a validação cruzada é por vídeo, não por motorista.
 - **Falso alarme medido só parado:** a taxa de 6,7 por hora vem de pessoas acordadas gravando a si mesmas, sem dirigir, a 10 fps, e depende muito de quem está na câmera. Não vale para uma viagem.
 - **Redes × EAR:** nenhum classificador supera o EAR de forma conclusiva. O treino é em infravermelho (MRL) e o teste em RGB.
