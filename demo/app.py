@@ -217,6 +217,7 @@ class Demo:
                     "rosto": rosto, "p_fech": self.maquina.olho, "limiar_olho": self.maquina.limiar, "limiar_yolo": LIMIAR_OLHO,
                     "sinal_olho": self.maquina.sinal.nome(), "boca": boca,
                     "bocejo": est["bocejo"], "fechado": est["fechado"], "fechado_ha": est["fechado_ha"],
+                    "sorriso_val": sorriso, "sorriso": est["sorriso"], "filtro_sorriso": not self.args.sem_sorriso,
                     "micros_5min": est["micros_5min"],
                     "calibrando": mon["calibrando"], "seg_calibrar": num(mon["segundos_para_calibrar"]),
                     "seg_proxima_mil": num(mon["segundos_para_proxima_mil"]), "minutos_mil": mon["minutos_no_saco"],

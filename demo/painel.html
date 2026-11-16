@@ -58,6 +58,10 @@
   button:hover { border-color: var(--azul); }
   button.ativo { background: var(--azul); border-color: var(--azul); }
   .pilula { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; background: #222935; }
+  /* filtros da regra de microssono: âmbar quando seguram o alarme, apagado quando desligados */
+  #filtros { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .pilula.segurando { background: #f0b428; color: #14171c; font-weight: 600; }
+  .pilula.desligado { opacity: 0.5; text-decoration: line-through; }
   footer { color: var(--suave); text-align: center; font-size: 13px; padding: 4px 22px 22px; }
   /* pesos da atenção da MIL, um por minuto do saco */
   #pesos { display: flex; align-items: flex-end; gap: 4px; height: 44px; margin-top: 8px; }
@@ -147,6 +151,7 @@
         <div class="valor" id="p_fech">–</div>
         <div class="barra"><i id="b_pfech"></i><span class="marca" id="m_olho"></span></div>
         <div class="nota" id="boca">boca: –</div>
+        <div class="nota" id="filtros"></div>
       </div>
     </div>
 
@@ -360,8 +365,14 @@ function desenhar(e) {
   largura($("b_pfech"), e.p_fech || 0);
   $("m_olho").style.left = (e.limiar_olho * 100) + "%";
   $("b_pfech").style.background = e.fechado ? cor("microssono") : "var(--azul)";
-  $("boca").innerHTML = e.boca == null ? "boca: –" :
-    `boca: ${e.boca.toFixed(2).replace(".", ",")} ${e.bocejo ? '<span class="pilula">bocejo: olho fechado não conta para o microssono</span>' : ""}`;
+  const num2 = v => v == null ? "–" : v.toFixed(2).replace(".", ",");
+  $("boca").textContent = `boca: ${num2(e.boca)} · sorriso: ${num2(e.sorriso_val)}`;
+  // filtros da regra: olho fechado durante bocejo ou sorriso não conta para o microssono (o piso de 3 s continua)
+  const filtro = (nome, ativo, ligado) => !ligado
+    ? `<span class="pilula desligado">filtro de ${nome}: desligado</span>`
+    : ativo ? `<span class="pilula segurando">${nome} detectado: olho fechado não conta</span>`
+            : `<span class="pilula">filtro de ${nome}: pronto</span>`;
+  $("filtros").innerHTML = filtro("bocejo", e.bocejo, true) + filtro("sorriso", e.sorriso, e.filtro_sorriso !== false);
 
   if (e.perclos == null) { $("perclos").textContent = "aguardando 1 min"; largura($("b_perclos"), 0); }
   else {
