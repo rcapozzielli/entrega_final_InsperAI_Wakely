@@ -1,0 +1,53 @@
+% Figura 1: arquitetura e fluxo do Wakely (da câmera ao painel)
+\begin{tikzpicture}[x=1cm,y=1cm,
+  n/.style={draw,rounded corners=2pt,align=center,font=\scriptsize,inner sep=3pt,minimum height=0.85cm,fill=white},
+  nA/.style={n,fill=blue!7,draw=blue!50!black},
+  nB/.style={n,fill=orange!12,draw=orange!60!black},
+  nf/.style={n,fill=black!78,text=white,draw=black},
+  nc/.style={n,fill=black!6,draw=black!60},
+  arr/.style={-{Stealth[length=4.5pt]},thick,black!75},
+  lab/.style={font=\tiny\itshape,text=black!65,fill=white,inner sep=1pt}]
+  % topo
+  \node[nc,text width=4.6cm] (cam) at (7.8,0) {\textbf{Câmera}\\quadro colorido, cerca de 25 por segundo};
+  \node[nc,text width=6.4cm] (mp) at (7.8,-1.5) {\textbf{MediaPipe} (pronto, sem treino)\\478 pontos do rosto, notas de expressão, pose da cabeça};
+  \draw[arr] (cam)--(mp);
+  % lado A
+  \node[nA,text width=2.2cm] (ear) at (1.2,-3.3) {\textbf{EAR}\\altura $\div$ largura do olho (6 pontos)};
+  \node[nA,text width=2.5cm] (yolo) at (3.9,-3.3) {\textbf{YOLO26n-cls}\\recorte do olho 64$\times$64, P(fechado)};
+  \node[nA,text width=2.3cm] (boca) at (6.6,-3.3) {\textbf{Boca e sorriso}\\8 pontos da boca, nota de sorriso};
+  \node[nA,text width=4.4cm] (fus) at (2.55,-5.0) {\textbf{Fusão}\\média do EAR relativo e do P(fechado), limiar 0,35};
+  \node[nA,text width=2.3cm] (fil) at (6.6,-5.0) {\textbf{Filtros}\\bocejo: boca $>$ 0,25; sorriso $\geq$ 0,5};
+  \node[nf,text width=7cm] (reg) at (3.9,-6.8) {\textbf{Regra de tempo}\\olho fechado por 1 s: microssono\\3 s: piso, vale até no bocejo \quad 6 s: sem resposta};
+  \node[nf,text width=3.6cm] (alA) at (3.9,-8.35) {\textbf{Aviso de microssono}\\som e aviso no painel};
+  % lado B
+  \node[nB,text width=6.6cm] (sin) at (12.0,-3.3) {\textbf{4 sinais por quadro, a 10 por segundo}\\P(fechado), EAR, boca e rosto};
+  \node[nB,text width=2.7cm] (per) at (9.9,-5.0) {\textbf{PERCLOS}\\fração do minuto com o olho fechado};
+  \node[nB,text width=3.2cm] (mil) at (13.6,-5.0) {\textbf{Rede MIL}\\menos o 1º minuto da pessoa; GRU por minuto e atenção nos últimos 9};
+  \node[nf,text width=4.2cm] (comb) at (11.75,-6.8) {\textbf{PERCLOS combinado}\\(Wakely-MIL) comparado ao limiar do UTA};
+  \node[nf,text width=3.6cm] (alB) at (11.75,-8.35) {\textbf{Aviso de sonolência}\\a cada minuto completo};
+  % estados e painel
+  \node[nc,text width=9.2cm] (est) at (7.8,-10.0) {\textbf{Máquina de estados}\\calibrando, normal, atenção, sonolento; 10 s sem rosto avisa que o sistema não está funcionando};
+  \node[nc,text width=4.6cm] (pai) at (7.8,-11.3) {\textbf{Painel no navegador}\\rosto, filtros, entradas da MIL};
+  % setas
+  \draw[arr] (mp.south) -- ++(0,-0.45) -| (ear.north);
+  \draw[arr] (mp.south) -- ++(0,-0.45) -| (yolo.north);
+  \draw[arr] (mp.south) -- ++(0,-0.45) -| (boca.north);
+  \draw[arr] (mp.south) -- ++(0,-0.45) -| (sin.north);
+  \draw[arr] (ear.south) -- (ear.south |- fus.north);
+  \draw[arr] (yolo.south) -- (yolo.south |- fus.north);
+  \draw[arr] (boca)--(fil);
+  \draw[arr] (fus.south) -- ++(0,-0.35) -| (reg.north -| fus.south);
+  \draw[arr] (fil.south) -- ++(0,-0.35) -| ([xshift=2.7cm]reg.north west);
+  \draw[arr] (reg)--(alA);
+  \draw[arr] (sin.south) -- ++(0,-0.35) -| (per.north);
+  \draw[arr] (sin.south) -- ++(0,-0.35) -| (mil.north);
+  \draw[arr] (per.south) -- ++(0,-0.35) -| ([xshift=-0.9cm]comb.north);
+  \draw[arr] (mil.south) -- ++(0,-0.35) -| ([xshift=0.9cm]comb.north);
+  \draw[arr] (comb)--(alB);
+  \draw[arr] (alA.south) -- ++(0,-0.3) -| ([xshift=-2.2cm]est.north);
+  \draw[arr] (alB.south) -- ++(0,-0.3) -| ([xshift=2.2cm]est.north);
+  \draw[arr] (est)--(pai);
+  % rótulos dos lados
+  \node[font=\footnotesize\bfseries,text=blue!50!black] at (3.9,-2.35) {A. Microssono, por quadro};
+  \node[font=\footnotesize\bfseries,text=orange!60!black] at (12.0,-2.35) {B. Sonolência, por minuto};
+\end{tikzpicture}

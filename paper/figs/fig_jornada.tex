@@ -1,0 +1,36 @@
+% Figura 2: o caminho até os sistemas finais (verde: ficou; vermelho: ficou de fora; escuro: sistema final)
+\begin{tikzpicture}[x=1cm,y=1cm,
+  ok/.style={draw=green!40!black,fill=green!8,rounded corners=2pt,text width=2.95cm,align=center,font=\scriptsize,inner sep=3pt,minimum height=2.0cm},
+  no/.style={draw=red!60!black,fill=red!7,rounded corners=2pt,text width=2.95cm,align=center,font=\scriptsize,inner sep=3pt,minimum height=1.6cm},
+  aj/.style={draw=orange!70!black,fill=yellow!14,rounded corners=2pt,text width=2.95cm,align=center,font=\scriptsize,inner sep=3pt,minimum height=1.6cm},
+  fin/.style={draw=black,fill=green!35!black,text=white,rounded corners=2pt,text width=2.95cm,align=center,font=\scriptsize,inner sep=3pt,minimum height=2.0cm},
+  arr/.style={-{Stealth[length=4pt]},thick,black!70},
+  rej/.style={-{Stealth[length=3pt]},dashed,black!45}]
+  % faixa do microssono
+  \node[font=\small\bfseries,anchor=west] at (0,4.6) {Microssono \normalfont\footnotesize\ \ o olho fechou agora: avisar em 1 segundo};
+  \node[ok]  (a1) at (1.5,0)   {{\footnotesize\bfseries $\checkmark$ EAR + regras}\\geometria do olho, sem treino; regras do Euro NCAP; 79\% dos microssonos};
+  \node[ok]  (a2) at (4.65,0)  {{\footnotesize\bfseries $\checkmark$ Alarme em $T=1$ s}\\início do microssono no Euro NCAP, e não o melhor número da base};
+  \node[ok]  (a3) at (7.8,0)   {{\footnotesize\bfseries $\checkmark$ CNN de olho: YOLO}\\YOLO26n-cls com \emph{fine-tuning}; P(fechado) por quadro; 84,5\% dos microssonos};
+  \node[ok]  (a4) at (10.95,0) {{\footnotesize\bfseries $\checkmark$ Filtro de bocejo + piso}\\bocejo não conta; 3 s sempre apita; falsos alarmes de 33 para 10};
+  \node[fin] (a5) at (14.1,0)  {{\footnotesize\bfseries $\star$ Fusão EAR + YOLO}\\média dos dois sinais e filtro de sorriso; 90,7\% dos microssonos, 6 falsos\\\textbf{sistema final de microssono}};
+  \draw[arr] (a1)--(a2); \draw[arr] (a2)--(a3); \draw[arr] (a3)--(a4); \draw[arr] (a4)--(a5);
+  \node[no] (r2) at (4.65,3.0)  {{\footnotesize\bfseries $\times$ $T=0{,}4$ s}\\era o melhor número da base, mas a base não tem piscadas: apitaria nelas};
+  \node[no] (r3) at (7.8,3.0)   {{\footnotesize\bfseries $\times$ MobileNetV3}\\outra CNN de olho: achou 73,5\% contra 84,5\% do YOLO};
+  \node[no] (r4) at (10.95,3.0) {{\footnotesize\bfseries $\times$ Agente de RL}\\aprender quando avisar: não superou a regra; pouco vídeo por pessoa};
+  \node[no] (r5) at (14.1,3.0)  {{\footnotesize\bfseries $\times$ Laya (rede de linguagem)}\\achou mais microssonos, mas com 3 vezes mais alarmes (21,6 contra 6,3 por hora)};
+  \draw[rej] (a2)--(r2); \draw[rej] (a3)--(r3); \draw[rej] (a4)--(r4); \draw[rej] (a5)--(r5);
+  \node[aj] (j1) at (1.5,-2.8)  {{\footnotesize\bfseries $\approx$ Ajustes do sinal}\\suavizar e histerese mudaram pouco o resultado};
+  \draw[rej] (a1)--(j1);
+  \node[no] (r6) at (14.1,-2.8) {{\footnotesize\bfseries $\times$ Limiar adaptativo}\\o YOLO já dá quase 0 no olho aberto; nada muda, a fusão já corrige};
+  \draw[rej] (a5)--(r6);
+  \node[font=\scriptsize,text width=6.4cm,align=center] at (7.8,-2.8) {\textbf{Regra de ouro em todos os testes:} separar por pessoa e fixar o critério antes de rodar (senão a rede decora o rosto e o número engana)};
+  % faixa da sonolência
+  \node[font=\small\bfseries,anchor=west] at (0,-4.6) {Sonolência \normalfont\footnotesize\ \ antes do microssono: o padrão do olho nos últimos minutos};
+  \node[ok]  (b1) at (1.5,-7.3)  {{\footnotesize\bfseries $\checkmark$ PERCLOS}\\porcentagem do minuto com olho fechado; sem treino, régua simples};
+  \node[ok]  (b2) at (7.8,-7.3)  {{\footnotesize\bfseries $\checkmark$ Rede MIL}\\compara a pessoa com o próprio 1º minuto};
+  \node[fin] (b3) at (14.1,-7.3) {{\footnotesize\bfseries $\star$ PERCLOS combinado}\\os dois juntos (Wakely-MIL); AUC média 0,742 em 4 bases\\\textbf{sistema final de sonolência}};
+  \draw[arr] (b1)--(b2); \draw[arr] (b2)--(b3);
+  \node[no] (s1) at (4.65,-9.9)  {{\footnotesize\bfseries $\times$ GRU, TCN, Transformer}\\redes no tempo: não superaram o PERCLOS};
+  \node[no] (s2) at (10.95,-9.9) {{\footnotesize\bfseries $\times$ MIL-Transformer}\\caiu numa base de direção real (SUST-DDD): AUC 0,484};
+  \draw[rej] (b1.south east) -- (s1.north west); \draw[rej] (b2.south east) -- (s2.north west);
+\end{tikzpicture}

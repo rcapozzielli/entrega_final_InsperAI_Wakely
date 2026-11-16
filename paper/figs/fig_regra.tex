@@ -1,0 +1,28 @@
+% Figura 4: esquema da regra de tempo (ilustrativo, não são dados reais)
+\begin{tikzpicture}[x=0.9cm,y=1cm,
+  lab/.style={font=\scriptsize,align=center,text=black!80},
+  arr/.style={-{Stealth[length=4pt]},thick}]
+  % eixos
+  \draw[->] (0,0) -- (15.4,0) node[right,font=\tiny] {tempo (s)};
+  \draw[->] (0,0) -- (0,2.7) node[above right,font=\scriptsize] {P(fechado)};
+  \foreach \t in {0,2,4,6,8,10,12,14} {\draw (\t,0.06)--(\t,-0.06) node[below,font=\tiny] {\t};}
+  % limiar
+  \draw[dashed,black!55] (0,0.9)--(15.2,0.9) node[right,font=\tiny,text=black!65] {limiar};
+  % faixas de bocejo (boca aberta) e margem de 1 s
+  \fill[black!14] (6.0,-1.05) rectangle (8.5,-0.65);
+  \fill[black!7]  (8.5,-1.05) rectangle (9.5,-0.65);
+  \fill[black!14] (10.8,-1.05) rectangle (14.8,-0.65);
+  \fill[black!7]  (14.8,-1.05) rectangle (15.4,-0.65);
+  \node[lab,anchor=east] at (-0.1,-0.85) {boca aberta};
+  \node[lab] at (7.25,-0.85) {bocejo};
+  \node[lab] at (12.8,-0.85) {bocejo};
+  % curva de P(fechado)
+  \draw[very thick,blue!60!black] (0,0.1)--(1.0,0.1)--(1.05,2.0)--(1.3,2.0)--(1.35,0.1)--(3.0,0.1)--(3.05,2.1)--(4.6,2.1)--(4.65,0.1)--(6.5,0.1)--(6.55,2.0)--(8.0,2.0)--(8.05,0.1)--(11.2,0.1)--(11.25,2.1)--(14.6,2.1)--(14.65,0.1)--(15.4,0.1);
+  % avisos
+  \draw[arr,red!70!black] (4.0,3.0)--(4.0,2.25); \node[lab,text=red!70!black] at (4.0,3.45) {aviso\\(1 s fechado)};
+  \draw[arr,red!70!black,line width=1.4pt] (14.1,3.0)--(14.1,2.25); \node[lab,text=red!70!black] at (13.0,3.6) {\textbf{aviso forte}\\piso de 3 s, vale no bocejo};
+  % anotações
+  \node[lab] at (2.0,3.1) {piscada (0,3 s):\\sem aviso};
+  \node[lab] at (7.3,3.2) {fechado por 1,5 s\\dentro do bocejo:\\ignorado};
+  \node[lab] at (11.1,-1.55) {};
+\end{tikzpicture}
