@@ -13,6 +13,8 @@ from avaliar import RAIZ, TOL, alarmes, carregar
 
 SIN = RAIZ / "data" / "cache" / "sinais"
 BINUS = next((RAIZ / "data/bases_novas/Bases Novas Wakely/Microssono/binus_rpi5/binus_rpi5_x").glob("*/other_testing/x/other_testing"), None)
+if BINUS is None and (RAIZ / "data/bases_novas/binus_rpi5/other_testing").is_dir():
+    BINUS = RAIZ / "data/bases_novas/binus_rpi5/other_testing"      # só os output.labels, extraídos do zip da base
 SISTEMAS = ("yolo", "fusao")
 B, SEM = 5000, 42
 

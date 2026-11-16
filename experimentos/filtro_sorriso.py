@@ -2,7 +2,7 @@
 
 Uso: python experimentos/filtro_sorriso.py
 Bases: classe alerta do UTA-RLDD (data/cache/rldd_rico) e, se os .npz existirem em data/cache/sinais, o Eyeblink8.
-A parte de segurança (FL3D e BINUS) fica para quando os sinais do Antônio estiverem no disco.
+A segurança no FL3D é medida no notebook (seção 11.5); aqui, a da BINUS. O filtro é o da demo (demo/alerta.py).
 Saída: tabelas na tela e data/cache/filtro_sorriso.json.
 """
 import json
@@ -20,51 +20,25 @@ I_SORRISO = (53, 54)                   # mouthSmileLeft e mouthSmileRight nos 61
 B, SEM = 5000, 42
 
 
-class RegraSorriso(alerta.RegraAlerta):
-    """A regra da demo, com o sorriso somado ao bocejo: olho fechado durante sorriso não conta para o microssono.
-
-    O sorriso liga e desliga como o bocejo (BOCA_PERSIST seguidos acima do limiar, vale BOCA_MARGEM depois).
-    O piso de 3 s e 6 s continua usando o trecho bruto, então vale mesmo durante sorriso.
-    """
-
-    def __init__(self, lim):
-        self.lim = lim
-        super().__init__()
-
-    def reiniciar(self):
-        super().reiniciar()
-        self.altas_s, self.sorriso_ate, self.sorriso = 0, -1.0, None
-
-    def _bocejo(self, t, boca):
-        bocejo = super()._bocejo(t, boca)
-        if self.lim is None:
-            return bocejo
-        self.altas_s = self.altas_s + 1 if (self.sorriso is not None and self.sorriso >= self.lim) else 0
-        if self.altas_s * self.dt >= alerta.BOCA_PERSIST - 1e-6:
-            self.sorriso_ate = t + alerta.BOCA_MARGEM
-        self.sorriso_ativo = t <= self.sorriso_ate + 1e-6
-        return bocejo or self.sorriso_ativo
-
-
 def alarmes(t, s, lim):
-    """Avisos da fusão (limiar 0,35, filtro de bocejo, T = 1 s, piso) com o filtro de sorriso no limiar `lim`
-    (None = sem filtro). Devolve os instantes por nível e, para cada microssono, se havia sorriso ativo
-    (pelo limiar do protocolo) naquele instante."""
+    """Avisos da fusão (limiar 0,35, filtro de bocejo, T = 1 s, piso) com o filtro de sorriso da demo
+    (demo/alerta.py) no limiar `lim` (None = sem filtro). Devolve os instantes por nível e, para cada microssono,
+    se havia sorriso ativo (pelo limiar do protocolo) naquele instante."""
     x, boca = sinal("fusao", t, s)
     sorriso = np.nanmean(s[:, list(I_SORRISO)], axis=1)
-    r, ref = RegraSorriso(lim), RegraSorriso(SORRISO_LIM)     # ref só observa o sorriso, não filtra nada
+    r = alerta.RegraAlerta(sorriso=lim is not None, sorriso_lim=SORRISO_LIM if lim is None else lim)
+    ref = alerta.RegraAlerta(sorriso=True, sorriso_lim=SORRISO_LIM)      # só observa o sorriso
     saida = {"microssono": [], "sono": [], "sem resposta": [], "micro_com_sorriso": []}
     for ti, xi, bi, si in zip(t, x, boca, sorriso):
         xi = None if np.isnan(xi) else float(xi)
         bi = None if np.isnan(bi) else float(bi)
-        r.sorriso = ref.sorriso = None if np.isnan(si) else float(si)
-        novos, _ = r.passo(float(ti), xi, bi, LIMIARES["fusao"])
-        ref.dt = r.dt                                        # mesmo intervalo entre quadros da regra
-        ref._bocejo(float(ti), bi)
+        si = None if np.isnan(si) else float(si)
+        novos, _ = r.passo(float(ti), xi, bi, LIMIARES["fusao"], si)
+        _, info = ref.passo(float(ti), xi, bi, LIMIARES["fusao"], si)
         for n in novos:
             saida[n].append(float(ti))
             if n == "microssono":
-                saida["micro_com_sorriso"].append(bool(ref.sorriso_ativo))
+                saida["micro_com_sorriso"].append(bool(info["sorriso"]))
     return saida
 
 
@@ -117,5 +91,27 @@ if __name__ == "__main__":
         print(f"  com − sem filtro: {dif:+.2f}/h (IC95% {lo:+.2f} a {hi:+.2f})")
         print(f"  descrição: {com_sorriso} dos {total} avisos sem filtro tinham sorriso ativo, em {pessoas} vídeos")
         saida[base] = dict(videos=n, horas=h, dif=dif, ic=(float(lo), float(hi)), com_sorriso=com_sorriso, total=total)
+
+    # ------------------------------------------------------------ segurança na BINUS (condição 1)
+    from testes_bases_novas import BINUS, TOL, episodios, rotulo_binus
+    if BINUS and list(SIN.glob("binus_*.npz")):
+        por = {v: [] for v in versoes}
+        for npz in sorted(SIN.glob("binus_*.npz")):
+            t, s = carregar(npz)
+            tr, fr = rotulo_binus(BINUS / npz.stem.removeprefix("binus_"))
+            eps = episodios(tr, fr)
+            longos = [e for e in eps if e[1] - e[0] >= 1.0 - 1e-6]
+            for v, lim in versoes.items():
+                al = alarmes(t, s, lim)["microssono"]
+                dentro = lambda a, e: e[0] - TOL <= a <= e[1] + TOL  # noqa: E731
+                por[v].append(dict(video=npz.stem, ep=len(longos), ac=sum(any(dentro(a, e) for a in al) for e in longos),
+                                   falsos=sum(not any(dentro(a, e) for e in eps) for a in al)))
+        print("\nBINUS, segurança (47 vídeos, fechamentos de 1 s ou mais)")
+        for v in versoes:
+            ep, ac, fa = (sum(l[k] for l in por[v]) for k in ("ep", "ac", "falsos"))
+            print(f"  {v:20s} achados {ac} de {ep} | falsos {fa}")
+        perdidos = sum(a["ac"] - b["ac"] for a, b in zip(por["sem filtro"], por["com filtro (0,5)"]))
+        print(f"  microssonos perdidos com o filtro (0,5): {perdidos} (critério: no máximo 1)")
+        saida["BINUS"] = dict(por_video=por, perdidos=perdidos)
 
     json.dump(saida, open(RAIZ / "data/cache/filtro_sorriso.json", "w", encoding="utf-8"), indent=1, default=float)

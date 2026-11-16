@@ -58,8 +58,9 @@ class Demo:
         self.args = args
         print("Carregando MediaPipe, YOLO e a rede MIL...", flush=True)
         self.extrator = ExtratorRosto()
+        self.i_sorriso = [self.extrator.canais.index(n) for n in ("mouthSmileLeft", "mouthSmileRight")]
         self.monitor = MonitorSonolencia()
-        self.maquina = MaquinaEstados(args.sinal)
+        self.maquina = MaquinaEstados(args.sinal, sorriso=not args.sem_sorriso)
         self.trava = threading.Lock()
         self.estado = {"nivel": "calibrando", "texto": "Iniciando a câmera...", "iniciado": False}
         self.jpeg = None
@@ -194,9 +195,10 @@ class Demo:
             p_fech = num(np.nanmean(linha[:2])) if rosto else None
             boca = num(linha[4]) if rosto else None
             ear = num(np.nanmean(linha[2:4])) if rosto else None
+            sorriso = num(np.nanmean(linha[self.i_sorriso])) if rosto else None
             mon = self.monitor.adicionar(t * 1000, linha)
             with self.trava:
-                est = self.maquina.passo(t, rosto, p_fech, boca, mon, ear)
+                est = self.maquina.passo(t, rosto, p_fech, boca, mon, ear, sorriso)
                 ms = (time.perf_counter() - inicio) * 1000
                 ms_ema = ms if ms_ema is None else 0.9 * ms_ema + 0.1 * ms
                 if t_ant is not None and t > t_ant:
@@ -297,6 +299,8 @@ def main():
     ap.add_argument("--rapido", action="store_true", help="com --video, processar o mais rápido possível")
     ap.add_argument("--sinal", choices=["fusao", "yolo"], default="fusao",
                     help="sinal do olho na regra: fusão EAR + YOLO (padrão, limiar 0,35) ou só o YOLO (limiar 0,4)")
+    ap.add_argument("--sem-sorriso", action="store_true",
+                    help="desligar o filtro de sorriso (seção 11.5): olho fechado sorrindo volta a contar para o microssono")
     ap.add_argument("--porta", type=int, default=8765)
     ap.add_argument("--log", help="arquivo CSV para registrar só os eventos (sem vídeo)")
     ap.add_argument("--sem-video", action="store_true", help="não mostrar a imagem da câmera no painel")

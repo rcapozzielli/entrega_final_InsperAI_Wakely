@@ -6,7 +6,7 @@ Protótipo acadêmico de detecção de sonolência ao volante com câmera e deep
 
 ## Status
 
-A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já roda a linha de base, a CNN de olho, o filtro de bocejo, o agente de RL, o modelo temporal (GRU, TCN e transformer), a análise de erros dos modelos de sonolência, uma rede MIL com validação externa no DROZY e a escolha do modelo final de sonolência em 4 bases (seção 12). A demo com webcam está em [`demo/app.py`](demo/app.py).
+A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já roda a linha de base, a CNN de olho, o filtro de bocejo, o agente de RL, o modelo temporal (GRU, TCN e transformer), a análise de erros dos modelos de sonolência, uma rede MIL com validação externa no DROZY, a escolha do modelo final de microssono (seção 11) e a do modelo final de sonolência em 4 bases (seção 12). A demo com webcam está em [`demo/app.py`](demo/app.py).
 
 | Etapa | Estado | Resultado no teste |
 | --- | --- | --- |
@@ -17,6 +17,7 @@ A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já r
 | Filtro de bocejo e teste de piscadas | Feita | YOLO com filtro: 86,8% dos episódios de 1 s ou mais e 10 falsos alarmes nos 44 vídeos (F2 0,88), contra 84,5% e 33 sem filtro (F2 0,84) |
 | Fusão do EAR com o YOLO (seção 6.3) | Feita | Média dos dois, com filtro: 90,7% dos episódios de 1 s ou mais e 6 falsos alarmes nos 44 vídeos (F2 0,92); ganha do YOLO em acertos e em F2 e do EAR em falsos alarmes, com intervalos sem zero |
 | Precisão por alarme, F1 e F2 (protocolo fixado antes) | Feita | Juntam acerto e alarme falso; o F2 pesa mais o recall. Confirmam as conclusões anteriores, e a fusão pela média tem o maior F2. Servem para comparar sinais no FL3D, não para descrever uma viagem |
+| Modelo final de microssono: alarmes em pessoas acordadas, BINUS, limiar adaptativo, Laya e filtro de sorriso (protocolos fixados antes) | Feito | Fusão com filtro de bocejo, piso de 3 s e filtro de sorriso: 4,6 alarmes por hora em pessoas acordadas (Eyeblink8 e UTA), contra 6,7 do YOLO com filtro. Fora do FL3D (BINUS), acha só cerca de 30% dos microssonos de 1 s ou mais. Limiar adaptativo e Laya não entram |
 | Agente de RL no alerta (Q-learning, piso de 3 s) | Feito | Não supera a regra: com YOLO e λ = 10, 90% dos episódios de 1 s ou mais e 13 falsos alarmes (2 fortes), contra 90% e 10 da regra com piso. Os números do YOLO mudam com a GPU |
 | Falsos alarmes em pessoas acordadas (UTA-RLDD) | Feito | 6,7 alarmes por hora em 9,5 h; 90% das pessoas sem nenhum, e uma pessoa com 40 dos 64 |
 | Modelo temporal (GRU e TCN, UTA-RLDD) | Feito | Não supera o PERCLOS: AUC 0,750 (GRU) e 0,754 (TCN), contra 0,774 do PERCLOS do minuto |
@@ -24,7 +25,7 @@ A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já r
 | Análise de erros dos modelos de sonolência | Feita | AUC de cerca de 0,85 dentro da pessoa e 0,77 entre pessoas; os 9 modelos erram os mesmos vídeos |
 | Rede MIL normalizada pelo 1º minuto, com validação externa no DROZY (protocolo fixado antes) | Feita | Supera a logística com os mesmos sinais no UTA (AUC 0,742 contra 0,654) e no DROZY (0,708 contra 0,575), mas não o PERCLOS absoluto no UTA (0,814) |
 | Modelo final de sonolência em 4 bases: UTA, DROZY, SUST-DDD e UL-DD (protocolo fixado antes) | Feito | PERCLOS combinado com a MIL: AUC média 0,742, contra 0,706 do PERCLOS absoluto; não supera o PERCLOS de forma confirmada nas bases novas |
-| Demo com webcam (`demo/app.py`) | Feita | Alerta de microssono ao vivo, com a mesma regra do notebook (163 de 163 avisos nos 44 vídeos do FL3D), e PERCLOS e MIL lado a lado; falta medir os FPS na máquina da apresentação |
+| Demo com webcam (`demo/app.py`) | Feita | Alerta de microssono ao vivo com o sistema final da seção 11 (fusão, filtro de bocejo, piso de 3 s e filtro de sorriso), e PERCLOS e MIL lado a lado; falta medir os FPS na máquina da apresentação |
 
 T é o tempo de olho fechado até o alerta. Usamos T = 1 s, o limite inferior da faixa de microssono do Euro NCAP. Dos 26 episódios do teste, só 14 duram 1 s ou mais: neles, o EAR acha 7 e a CNN, 13. Na calibração, os dois quase empatam (114 e 111 de 228 episódios), e o resultado da CNN varia entre treinos.
 
@@ -35,6 +36,8 @@ Com 5 sementes, a YOLO26n-cls supera a MobileNetV3 nos 44 vídeos (11 pontos a m
 Quase todos os falsos alarmes estavam ligados a bocejos, então o sistema passou a ignorar o olho fechado durante um bocejo detectado pela abertura da boca. Isso reduz o total em cerca de 23 alarmes nos três sinais. A base não mostra microssono junto de bocejo, que é o maior risco dessa escolha. Recolocando os frames que o FL3D removeu, T = 1 s parece segurar as piscadas (cerca de 1% dos buracos curtos atravessados por um alarme), mas sobram alarmes em trechos sem rótulo, então a taxa real de falso alarme ainda não está medida.
 
 A seção 7 testa um agente de reinforcement learning que decide, durante o olho fechado, entre esperar, aviso leve e aviso forte, com uma tecla de "foi alarme falso" simulada. Ele aprende sozinho a ignorar o bocejo e a avisar mais cedo quando a pessoa já teve vários fechamentos longos, mas não supera a regra com estes dados. Ela também testa um piso de 3 s que dispara mesmo durante bocejo. A seção 6.4 leva o piso para a regra principal, como componente de segurança: ele não muda nenhum acerto e custa 1 alarme com a fusão nos 44 vídeos.
+
+A seção 11 fecha o sistema de microssono com o critério da 10.4, fixado antes dos testes, e com sinais extraídos de bases novas pelo mesmo extrator da demo. A fusão do EAR com o YOLO dá menos alarmes falsos que o YOLO em pessoas acordadas (5,7 contra 6,7 por hora no Eyeblink8 e na classe alerta do UTA) e vira o sistema final. No Eyeblink8, uma webcam comum, ela era pior, e metade desses alarmes acontecia durante um sorriso: um filtro que ignora o olho fechado durante um sorriso detectado pelo MediaPipe, com protocolo próprio, corta os alarmes em acordados para 4,6 por hora (IC sem zero), mas perde 1 microssono no FL3D, a margem mínima que o critério permite. O limiar adaptativo (a linha de base do YOLO é quase zero) e o Laya, um modelo de linguagem como camada de decisão (3 vezes mais alarmes falsos), não entram. O resultado mais importante é a BINUS: com microssonos de outras pessoas, câmeras e acessórios, os dois sistemas acham só cerca de 30% dos fechamentos de 1 s ou mais, contra 90% no FL3D.
 
 A seção 8 usa o UTA-RLDD recortado: 1.126 clipes de 1 minuto, de 60 pessoas, alertas ou sonolentas, com rótulo autorrelatado. Em 9,5 horas de pessoas acordadas, a regra da demo dá 6,7 falsos alarmes por hora, mas 90% das pessoas não têm nenhum, e uma pessoa sozinha dá 40 dos 64. Os alarmes se concentram em quem tem o olho aberto menor na imagem. Para estimar a sonolência no minuto, com 5 dobras por pessoa, o PERCLOS sozinho chega a AUC de 0,77. A regressão logística sobre 6 atributos, a GRU e a TCN treinadas do zero ficam entre 0,75 e 0,76, sem diferença conclusiva: com estes sinais, o padrão de 1 minuto já está resumido no PERCLOS.
 
@@ -62,7 +65,7 @@ O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motorist
 2. O MediaPipe localiza os olhos.
 3. Um classificador com fine-tuning estima se o olho está fechado em cada frame. Vamos comparar MobileNetV3 e YOLO26n classificadora.
 4. Uma medida dos últimos minutos estima o nível de sonolência. O modelo final, escolhido na seção 12, é o PERCLOS combinado com a rede MIL da seção 8.7, que calibra no 1º minuto de uso e precisa de cerca de 10 minutos para ficar confiável. A demo ainda mostra as duas partes lado a lado, prontas em [`demo/sonolencia.py`](demo/sonolencia.py).
-5. Uma regra simples dispara o alerta quando o olho fica fechado por tempo prolongado.
+5. Uma regra simples dispara o alerta quando o olho fica fechado por 1 s ou mais, ignorando bocejos e sorrisos, e sempre dispara com 3 s ou mais. O sinal do olho é a média do EAR com o YOLO (seção 11).
 
 ## Conteúdo
 

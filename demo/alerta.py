@@ -8,7 +8,10 @@ RegraAlerta repete, quadro a quadro e em segundos, a regra das seções 6 e 7 do
   boca fechar (FILTRO = lim 0,25, persistência 3 e margem 25 quadros a 25 fps). Olho fechado durante bocejo não
   conta para o microssono;
 - microssono: olho fechado por T = 1 s, sem bocejo (limite inferior da faixa do Euro NCAP);
-- piso: olho fechado por 3 s ou mais avisa como sono MESMO durante bocejo, e 6 s ou mais como "sem resposta".
+- filtro de sorriso (seção 11.5, 15/11/2026): sorriso = média de mouthSmileLeft e mouthSmileRight; acima de
+  SORRISO_LIM (0,5) por 0,12 s seguidos liga o sorriso, que vale até 1 s depois. Olho fechado durante sorriso não conta
+  para o microssono. Fixado no docs/protocolo_filtro_sorriso.md antes de rodar; passou no critério;
+- piso: olho fechado por 3 s ou mais avisa como sono MESMO durante bocejo ou sorriso, e 6 s ou mais como "sem resposta".
 
 SinalOlho escolhe o sinal que entra na regra (14/11/2026). Por padrão é a FUSÃO pela média da seção 6.3, que virou o
 sistema de microssono pelo critério da 10.4: (fechamento pelo EAR + P(fechado)) / 2, com fechamento =
@@ -33,6 +36,7 @@ T_SEM_RESPOSTA = 6.0       # s
 BOCA_LIM = 0.25            # abertura da boca (vertical / largura)
 BOCA_PERSIST = 3 / 25      # s de boca aberta para ligar o bocejo
 BOCA_MARGEM = 25 / 25      # s que o bocejo continua depois de a boca fechar
+SORRISO_LIM = 0.5          # nota de sorriso do MediaPipe (seção 11.5); persistência e margem iguais às do bocejo
 
 
 class Trecho:
@@ -100,9 +104,10 @@ class SinalOlho:
 
 
 class RegraAlerta:
-    """Recebe (t em s, sinal do olho ou None sem rosto, abertura da boca, limiar) e devolve os avisos novos."""
+    """Recebe (t em s, sinal do olho ou None sem rosto, abertura da boca, limiar, sorriso) e devolve os avisos novos."""
 
-    def __init__(self):
+    def __init__(self, sorriso=True, sorriso_lim=SORRISO_LIM):
+        self.usar_sorriso, self.sorriso_lim = sorriso, sorriso_lim
         self.reiniciar()
 
     def reiniciar(self):
@@ -111,6 +116,8 @@ class RegraAlerta:
         self.t_ant, self.dt = None, 1 / 25
         self.altas = 0               # quadros seguidos de boca aberta
         self.bocejo_ate = -1.0       # o bocejo vale até este instante
+        self.altas_s = 0             # quadros seguidos com sorriso
+        self.sorriso_ate = -1.0      # o sorriso vale até este instante
         self.avisados = set()        # (nível, id do trecho) já avisados
         self.fechado_ha = 0.0
 
@@ -121,14 +128,22 @@ class RegraAlerta:
             self.bocejo_ate = t + BOCA_MARGEM
         return t <= self.bocejo_ate + 1e-6
 
-    def passo(self, t, p_fech, boca, limiar=None):
+    def _sorriso(self, t, sorriso):
+        # mesma lógica do bocejo, com a nota de sorriso (seção 11.5)
+        self.altas_s = self.altas_s + 1 if (sorriso is not None and sorriso >= self.sorriso_lim) else 0
+        if self.altas_s * self.dt >= BOCA_PERSIST - 1e-6:
+            self.sorriso_ate = t + BOCA_MARGEM
+        return self.usar_sorriso and t <= self.sorriso_ate + 1e-6
+
+    def passo(self, t, p_fech, boca, limiar=None, sorriso=None):
         if self.t_ant is not None and t > self.t_ant:
             self.dt = 0.8 * self.dt + 0.2 * (t - self.t_ant)     # intervalo típico entre quadros
         self.t_ant = t
         bocejo = self._bocejo(t, boca)
+        sorri = self._sorriso(t, sorriso)
         fechado = p_fech is not None and p_fech >= (LIMIAR_OLHO if limiar is None else limiar)
         dur_bruta = self.bruto.passo(t, fechado, self.dt)
-        dur_filtrada = self.filtrado.passo(t, fechado and not bocejo, self.dt)
+        dur_filtrada = self.filtrado.passo(t, fechado and not (bocejo or sorri), self.dt)
         self.fechado_ha = dur_bruta if fechado else 0.0
         novos = []
         for nivel, dur, limite, trecho in [("microssono", dur_filtrada, T_MICRO, self.filtrado),
@@ -138,7 +153,7 @@ class RegraAlerta:
             if trecho.ini is not None and dur >= limite - 1e-6 and chave not in self.avisados:
                 self.avisados.add(chave)
                 novos.append(nivel)
-        return novos, {"fechado": fechado, "bocejo": bocejo, "fechado_ha": self.fechado_ha}
+        return novos, {"fechado": fechado, "bocejo": bocejo, "sorriso": sorri, "fechado_ha": self.fechado_ha}
 
 
 NIVEIS = ["calibrando", "normal", "atencao", "sonolento", "microssono", "sono", "sem resposta", "sem rosto"]
@@ -163,8 +178,8 @@ class MaquinaEstados:
     MOSTRAR_ALERTA_S = 4.0   # quanto tempo o aviso rápido fica na tela
     JANELA_MICROS_S = 300.0  # 2 microssonos em 5 min também contam como sonolento
 
-    def __init__(self, sinal="fusao"):
-        self.regra = RegraAlerta()
+    def __init__(self, sinal="fusao", sorriso=True):
+        self.regra = RegraAlerta(sorriso)
         self.sinal = SinalOlho(sinal)
         self.reiniciar()
 
@@ -180,12 +195,12 @@ class MaquinaEstados:
         self.micros = deque()
         self.eventos = []                   # (t, tipo, detalhe)
 
-    def passo(self, t, linha_ok, p_fech, boca, monitor_estado, ear=None):
+    def passo(self, t, linha_ok, p_fech, boca, monitor_estado, ear=None, sorriso=None):
         """-> dict com o estado do painel e a lista de sons a tocar neste quadro."""
         sons = []
         olho, limiar = self.sinal.passo(t, p_fech if linha_ok else None, ear if linha_ok else None)
         self.olho, self.limiar = olho, limiar
-        novos, info = self.regra.passo(t, olho, boca if linha_ok else None, limiar)
+        novos, info = self.regra.passo(t, olho, boca if linha_ok else None, limiar, sorriso if linha_ok else None)
         for n in novos:
             self.eventos.append((t, n, f"olho fechado há {info['fechado_ha']:.1f} s"))
             self.alerta_rapido, self.alerta_ate = n, t + self.MOSTRAR_ALERTA_S
@@ -231,5 +246,5 @@ class MaquinaEstados:
             nivel = "calibrando"
         else:
             nivel = ["normal", "atencao", "sonolento"][self.nivel_sono]
-        return {"nivel": nivel, "texto": TEXTO[nivel], "sons": sons, "bocejo": info["bocejo"],
+        return {"nivel": nivel, "texto": TEXTO[nivel], "sons": sons, "bocejo": info["bocejo"], "sorriso": info["sorriso"],
                 "fechado": info["fechado"], "fechado_ha": info["fechado_ha"], "micros_5min": len(self.micros)}
