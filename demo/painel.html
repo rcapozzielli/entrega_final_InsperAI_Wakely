@@ -163,10 +163,12 @@
         <div class="nota" id="n_perclos">fração do minuto com olho fechado · sem treino</div>
       </div>
       <div class="cartao">
-        <div class="rotulo">Sonolência pela rede MIL (minutos desde a calibração)</div>
+        <div class="rotulo">Sonolência · Wakely-MIL</div>
         <div class="valor" id="mil">–</div>
-        <div class="barra"><i id="b_mil"></i><span class="marca" style="left:50%"></span></div>
-        <div class="nota" id="n_mil">deep learning · compara com o seu 1º minuto</div>
+        <div class="barra"><i id="b_mil"></i><span class="marca" id="m_comb" style="left:50%"></span></div>
+        <div class="nota">rede MIL-GRU (deep learning) + PERCLOS, treinada no UTA-RLDD</div>
+        <div class="nota" id="n_mil"></div>
+        <div class="nota" id="partes"></div>
         <div class="nota" id="mil_ultimo"></div>
         <div id="pesos" title="peso da atenção de cada minuto no saco"></div>
         <div class="nota" id="n_pesos"></div>
@@ -383,12 +385,26 @@ function desenhar(e) {
   $("m_perclos").style.left = (e.limiar_perclos / 0.2 * 100) + "%";
   $("n_perclos").textContent = `limiar ${pct(e.limiar_perclos)} (escolhido no UTA-RLDD) · escala até 20% · sem treino`;
 
-  if (e.p_mil == null) { $("mil").textContent = e.calibrando ? "calibrando" : "aguardando 1 min"; largura($("b_mil"), 0); }
-  else {
-    $("mil").textContent = pct(e.p_mil);
+  // modelo final (seção 12): escore padronizado no UTA; a barra vai de -2 a +2 e a marca é o limiar do UTA
+  const esc = z => Math.min(1, Math.max(0, (z + 2) / 4));
+  if (e.p_mil == null) {
+    $("mil").textContent = e.calibrando ? "calibrando" : "aguardando 1 min"; largura($("b_mil"), 0); $("partes").textContent = "";
+  } else if (e.combinado == null) {   // sem data/modelos/combinado_uta.json: mostra só a MIL
+    $("mil").textContent = "MIL " + pct(e.p_mil);
     largura($("b_mil"), e.p_mil);
     $("b_mil").style.background = e.p_mil >= e.limiar_mil ? cor("atencao") : cor("normal");
+    $("partes").textContent = "constantes do modelo final não encontradas: rode a seção 12 do notebook";
+  } else {
+    const acima = e.combinado >= e.limiar_combinado;
+    $("mil").textContent = (acima ? "sonolento" : "alerta") + " · " + (e.combinado >= 0 ? "+" : "") + fmt(e.combinado, 2);
+    largura($("b_mil"), esc(e.combinado));
+    $("m_comb").style.left = (esc(e.limiar_combinado) * 100) + "%";
+    $("b_mil").style.background = acima ? cor("atencao") : cor("normal");
+    $("partes").textContent = `partes: PERCLOS dos ${e.minutos_mil} min ${pct(e.perclos_saco)} · MIL ${pct(e.p_mil)}`;
   }
+  $("n_mil").textContent = e.p_mil != null && !e.saco_cheio
+    ? `${e.minutos_mil} min analisados · o acerto sobe com os minutos e fica confiável perto de 10 (seção 12.2)`
+    : e.p_mil != null ? `${e.minutos_mil} min analisados` : "";
   // o saco "lembra" o minuto mais sonolento; o último minuto sozinho e a atenção mostram de onde vem a P
   const pesos = e.pesos_mil || [];
   if (e.p_mil == null || !pesos.length) {

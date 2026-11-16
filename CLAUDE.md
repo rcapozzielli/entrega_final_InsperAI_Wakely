@@ -35,7 +35,7 @@ Webcam → MediaPipe → fusão (média do EAR relativo e do P(olho fechado) do 
 - **Agente de RL (seção 7):** é um experimento. Ele não supera a regra e não faz parte do pipeline.
 - **Modelo temporal (seção 8):** GRU, TCN e transformer sobre 1 minuto de sinais, no UTA-RLDD, também com cabeça e expressões (8.5). Nenhum supera o PERCLOS do minuto.
 - **Rede MIL (seção 8.7):** cada vídeo é normalizado pelo seu 1º minuto, e o vídeo vira um saco de minutos com atenção. Ela supera a logística com os mesmos sinais no UTA e no DROZY. A demo mostra lado a lado a MIL, com calibração no 1º minuto de uso, e o PERCLOS do último minuto.
-- **Modelo final de sonolência (seção 12):** PERCLOS combinado = média do PERCLOS absoluto e do logit da MIL-GRU-4 (média das 5 sementes), cada um padronizado com a média e o desvio do UTA, com peso fixo de ½. A demo ainda não calcula o combinado: mostra as duas partes separadas.
+- **Modelo final de sonolência (seção 12), chamado de Wakely-MIL na demo e no paper (16/11):** PERCLOS combinado = média do PERCLOS absoluto e do logit da MIL-GRU-4 (média das 5 sementes), cada um padronizado com a média e o desvio do UTA, com peso fixo de ½. A seção 12 grava as constantes e o limiar do UTA em `data/modelos/combinado_uta.json` (célula "Constantes do modelo final para a demo"), e `MonitorSonolencia` calcula o combinado a cada minuto, com o PERCLOS médio dos minutos do saco. O aviso de sonolência da máquina de estados usa o combinado no lugar da MIL sozinha. Sem o arquivo, a demo volta a mostrar só a MIL.
 - **`demo/sonolencia.py`:** módulo da demo, sem depender do notebook.
   - `ExtratorRosto` dá a mesma linha de 61 sinais da extração da seção 8.5 (conferido num clipe do UTA: diferença máxima de 0,001 no P(fechado) e zero no resto).
   - `MonitorSonolencia` reamostra para 10 fps, calibra no 1º minuto e, a cada minuto completo, dá o PERCLOS e a P(sonolento) da MIL (média das 5 sementes, saco com os últimos 9 minutos). No DROZY, reproduz as previsões da parte B.
@@ -111,7 +111,7 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 - **Piso de 3 s ignorando o filtro de bocejo:** na seção 6.4 (linha do tempo do FL3D, 5 sementes, mesmo limiar), não muda nenhum acerto e custa 1 alarme na fusão (de 0 a 3), 0 no YOLO e 9 no EAR. Na seção 7 (linha do tempo completa, 1 semente), custava 2 alarmes com o YOLO e 22 com o EAR.
 - **Modelo final de microssono (seção 11, sinais do Antônio, regra da demo):**
   - **Condição 2 (Eyeblink8 + UTA alerta, 10,2 h):** fusão 5,7 por hora, YOLO 6,7 (−1,0, de −5,1 a +1,5). No Eyeblink8, fusão 18,2 contra 10,6 (IC sem zero). O YOLO no UTA dá 6,4 aqui e 6,3 no registro do Antônio (1 alarme; outro cache `rldd_rico/`).
-  - **BINUS (47 vídeos, 152 fechamentos de 1 s ou mais pela definição do protocolo, contra 93 na 10.3):** YOLO 48 e fusão 46 achados (~30%), F2 0,364 e 0,352.
+  - **BINUS (47 vídeos, 152 fechamentos de 1 s ou mais, 31 durante bocejo e 12 de 3 s ou mais; os 93 antigos não juntavam buracos):** YOLO 48 e fusão 46 achados (~30%), F2 0,364 e 0,352.
   - **Limiar adaptativo:** b mediano ~0 em todas as bases; F-A − F em F2 −0,007 (de −0,019 a +0,001): não entra. No terço de olho menor do UTA, a fusão já corta de 18,3 para 13,0 por hora.
   - **Laya (fora do notebook, 1 semente):** 83 de 152 na BINUS, mas 21,6 alarmes por hora no UTA alerta com espera de 1 s: não entra.
   - **Sistema final:** fusão + filtro de bocejo + T = 1 s + piso de 3 s + filtro de sorriso.
@@ -171,10 +171,9 @@ Com T = 1 s, nos 44 vídeos, contando episódios de 1 s ou mais (165). Classific
 ## Próximos passos
 
 1. **Sonolência, depois da seção 12:** o modelo final é o PERCLOS combinado. O MIL-Transformer foi testado no protocolo novo e caiu na SUST-DDD. Falta:
-   - decidir se a demo passa a mostrar o combinado (precisa de cerca de 10 minutos de uso);
    - linha de base por pessoa, como calibrar na sessão alerta da mesma pessoa (exploratório futuro no protocolo), porque o erro vem da diferença entre pessoas;
    - revisar o rascunho do limiar adaptativo (`docs/protocolo_limiar_adaptativo.md`), já que b ≈ 0 nas bases.
-   - **Microssono (seção 11): fechado em 16/11.** Falta conferir a contagem da BINUS (152 × 93) antes do paper. Fine-tuning do YOLO com aumento (frente J), filtro de olhar para baixo (E) e cenários simulados (K) ficam como trabalho futuro.
+   - **Microssono (seção 11): fechado em 16/11.** Contagem da BINUS conferida: valem os 152 (juntando buracos de até 0,5 s, como no FL3D; os 93 antigos não juntavam). Fine-tuning do YOLO com aumento (frente J), filtro de olhar para baixo (E) e cenários simulados (K) ficam como trabalho futuro.
 2. **Demo com webcam (para 12/11): feita** (`demo/app.py`). Falta medir FPS na máquina da apresentação (12 a 19 quadros/s na webcam de uma RTX 4060) e ensaiar com pelo menos 2 minutos de câmera, para a MIL aparecer. O aviso de sonolência usa o `MonitorSonolencia` de `demo/sonolencia.py` (MIL e PERCLOS), e o `ExtratorRosto` também entrega o P(fechado) e a boca da regra, com um MediaPipe só por quadro. A webcam precisa de pelo menos 10 fps.
 3. **Fusão e filtro de sorriso na demo: feitos** (`demo/alerta.py`). Na BINUS, a fusão e o YOLO acham só ~30% dos microssonos de 1 s ou mais (seção 11.1), o que entra como limitação.
 4. **Falsos alarmes em situações difíceis:** gravações encenadas do grupo, só como teste, com conversa, olhares para baixo e bocejos com olho fechado, incluindo microssono encenado junto de bocejo.

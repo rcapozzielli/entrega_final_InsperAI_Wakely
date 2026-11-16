@@ -222,7 +222,9 @@ class MaquinaEstados:
 
         # sonolência: PERCLOS do último minuto, MIL e microssonos repetidos
         m = monitor_estado or {}
-        sinais = int(bool(m.get("perclos_alto"))) + int(bool(m.get("sonolento_mil")))
+        # modelo final (PERCLOS combinado, seção 12); sem as constantes, volta à MIL sozinha
+        final = m.get("sonolento_comb") if m.get("combinado") is not None else m.get("sonolento_mil")
+        sinais = int(bool(m.get("perclos_alto"))) + int(bool(final))
         alvo = 2 if (sinais == 2 or len(self.micros) >= 2) else sinais
         if alvo > 0:
             self.sinal_visto_em = t
@@ -232,7 +234,7 @@ class MaquinaEstados:
                 self.ultimo_aviso_sono = t
                 nome = "sonolento" if alvo == 2 else "atencao"
                 self.eventos.append((t, nome, f"PERCLOS alto: {bool(m.get('perclos_alto'))}, "
-                                              f"MIL: {bool(m.get('sonolento_mil'))}, microssonos em 5 min: {len(self.micros)}"))
+                                              f"modelo final: {bool(final)}, microssonos em 5 min: {len(self.micros)}"))
                 sons.append(nome)
         elif alvo < self.nivel_sono and self.sinal_visto_em is not None and t - self.sinal_visto_em >= self.HISTERESE_S:
             self.nivel_sono = alvo
