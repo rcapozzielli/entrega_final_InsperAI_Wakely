@@ -4,6 +4,8 @@ Protótipo acadêmico de detecção de sonolência ao volante com câmera e deep
 
 **O Wakely não é um dispositivo de segurança e nunca deve ser testado dirigindo.**
 
+**Apresentação final (slides):** https://claude.ai/artifact/3W2bTs7vigKjTtQCYqLD1c
+
 ## Status
 
 A pesquisa está concluída, e o notebook ([`wakely.ipynb`](wakely.ipynb)) já roda a linha de base, a CNN de olho, o filtro de bocejo, o agente de RL, o modelo temporal (GRU, TCN e transformer), a análise de erros dos modelos de sonolência, uma rede MIL com validação externa no DROZY, a escolha do modelo final de microssono (seção 11) e a do modelo final de sonolência em 4 bases (seção 12). A demo com webcam está em [`demo/app.py`](demo/app.py).
@@ -79,6 +81,7 @@ O teste em vídeo é pequeno (2 vídeos com microssono), e 2 dos seus 5 motorist
 | [`docs/pesquisa_wakely.md`](docs/pesquisa_wakely.md) | Pesquisa sobre biologia, indústria, arquitetura, datasets, avaliação e ética |
 | [`docs/pipeline_recomendado.png`](docs/pipeline_recomendado.png) | Diagrama do pipeline |
 | [`entrega_final.pdf`](entrega_final.pdf) | Enunciado da entrega |
+| [Slides da apresentação final](https://claude.ai/artifact/3W2bTs7vigKjTtQCYqLD1c) | Apresentação de 18/11/2026, com apêndice para as perguntas da banca |
 
 Para começar, leia o resumo e as decisões do grupo na pesquisa.
 
