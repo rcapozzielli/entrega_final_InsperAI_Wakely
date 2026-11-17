@@ -439,8 +439,11 @@ A demo (\texttt{demo/app.py}) lê a webcam do notebook, extrai os sinais com o m
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\textwidth]{figs/painel.png}
-\caption{\textbf{Painel da demo no navegador, no início do uso.} À esquerda, o vídeo espelhado com o tempo de olho fechado; à direita, o estado do sistema (aqui, calibrando o 1º minuto), o sinal de olho fechado com os filtros de bocejo e de sorriso, o PERCLOS do último minuto com o limiar de 2,4\% escolhido no UTA-RLDD, a sonolência do Wakely-MIL e os eventos. Embaixo, as entradas da MIL. Captura sem rosto: nenhum quadro de pessoa é mostrado.}
+\textbf{(a)}\\[2pt]
+\includegraphics[width=\textwidth]{figs/painel_a.jpeg}\\[6pt]
+\textbf{(b)}\\[2pt]
+\includegraphics[width=0.7\textwidth]{figs/painel_b.jpeg}
+\caption{\textbf{Painel da demo no navegador, em uso.} (a) Estado normal (``Tudo certo''): o vídeo espelhado com os olhos em verde (abertos) e a boca em contorno; à direita, o sinal de olho fechado da fusão EAR + YOLO (14,9\%, abaixo do limiar), o estado dos filtros de bocejo e de sorriso, o PERCLOS do último minuto (2,2\%, com o limiar de 2,4\% escolhido no UTA-RLDD) e o cartão do Wakely-MIL, que ainda aguarda 1 minuto de uso. (b) Cartão ``Entradas da MIL'': os quatro sinais por quadro do último minuto (P(fechado) do YOLO, EAR, abertura da boca e rosto visível) e, abaixo, os atributos do 1º minuto e do último minuto com a diferença, que é o que a rede lê. A pessoa na imagem é um integrante do grupo, que autorizou o uso.}
 \label{fig:painel}
 \end{figure}
 
