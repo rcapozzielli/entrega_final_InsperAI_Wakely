@@ -63,7 +63,7 @@ Este trabalho tem uma restrição de escala: poucos dados, uma GPU de 6 GB e dua
   \item uma regra de alerta de microssono que funde o EAR com um classificador de olho, com filtros de bocejo e de sorriso e um piso de segurança (seção~\ref{sec:metodo}), e a sua avaliação em cinco bases, com os alarmes em pessoas acordadas contados por hora (seção~\ref{sec:resA});
   \item um modelo de sonolência, o PERCLOS combinado com uma rede MIL, comparado ao PERCLOS em quatro bases independentes, com resultados negativos reportados com intervalo de confiança (seção~\ref{sec:resB});
   \item uma análise de por que o acerto cai entre pessoas: o PERCLOS acerta 11 de 11 pessoas dentro de cada pessoa na UL-DD, contra uma AUC de 0,763 entre pessoas (seções~\ref{sec:resB} e~\ref{sec:disc});
-  \item uma demo com webcam que roda os dois sistemas ao vivo (seção~\ref{sec:demo}) e o registro de critérios fixados antes, inclusive da troca de um deles depois de ver dados (seção~\ref{sec:protocolo}).
+  \item uma demo com webcam que roda os dois sistemas ao vivo (seção~\ref{sec:demo}) e o registro dos critérios fixados antes, inclusive da troca de um deles depois de ver dados (seção~\ref{sec:protocolo}), junto com o que cada experimento que falhou nos ensinou (seção~\ref{sec:licoes}).
 \end{enumerate}
 
 O restante do texto segue a ordem dos artigos de biologia computacional: primeiro o que encontramos (seção~\ref{sec:res}), depois a discussão (seção~\ref{sec:disc}) e, por fim, o que fizemos, com dados, redes e protocolo (seção~\ref{sec:metodo}). A figura~\ref{fig:arq} mostra o sistema inteiro, da câmera ao painel, e serve de mapa para o resto.
@@ -239,7 +239,7 @@ MIL-Transformer-14 & 0,875 & 0,743 & 0,484 & 0,677 & 0,695\\
 \subsection{O que não entrou}
 \label{sec:negativos}
 
-Vários experimentos foram feitos e descartados pelos critérios fixados antes. A tabela~\ref{tab:neg} lista cada um com o motivo. Eles ficam no notebook como resultado.
+Vários experimentos foram feitos e descartados pelos critérios fixados antes. A tabela~\ref{tab:neg} lista cada um com o motivo. Eles ficam no notebook como resultado, e a seção~\ref{sec:licoes} conta o que cada um ensinou. Como foram feitos está na seção~\ref{sec:descartados}.
 
 \begin{table}[!t]
 \centering\small
@@ -258,6 +258,48 @@ Fine-tuning com a SUST-DDD (12.2) & Não ajuda na UL-DD: GRU-4 $-0{,}064$, Trans
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\subsection{O que aprendemos errando}
+\label{sec:licoes}
+
+A figura~\ref{fig:jornada} mostra \emph{o que} ficou e o que saiu. Aqui está \emph{por que}: cada teste que não deu certo mudou uma decisão do projeto.
+
+\paragraph{1. O melhor número da base era uma armadilha ($T$).} Na varredura de $T$ no FL3D, $T = 0{,}4$ s vencia. Mas a base não tem piscadas, então quem avisa em qualquer fechamento sai ganhando. Fixamos $T = 1$ s, o limite inferior do Euro NCAP, e deixamos $0{,}4$ s só como referência otimista. \emph{Lição: o critério de escolha tem de estar fora da base que premia o atalho.}
+
+\paragraph{2. Geometria sem treino é uma linha de base forte.} A MobileNetV3 achou 73,5\% dos episódios, contra 84,5\% do YOLO, mas o YOLO não superou o EAR de forma conclusiva (+1,3, \ic{-7{,}5}{+13{,}7}). Os dois erram em lugares diferentes, e por isso a média dos dois (a fusão) ganhou: +3,9 pontos de acertos sobre o YOLO e $-10$ falsos alarmes sobre o EAR. Como essa ideia veio de olhar os mesmos 44 vídeos, o ganho pode ser otimista, e a Tabela~\ref{tab:micro} avisa disso. \emph{Lição: antes de treinar uma rede, medir o que a regra simples já faz.}
+
+\paragraph{3. Cada filtro cria um ponto cego, e cada ponto cego pede uma proteção.} O filtro de bocejo cortou os falsos alarmes do YOLO de 33 para 10, mas pode silenciar um microssono de boca aberta; daí o piso de 3 s. A fusão ficou pior que o YOLO no Eyeblink8 (18,2 contra 10,6 por hora), o que só apareceu ao medir em pessoas acordadas; daí o filtro de sorriso. E o limiar de olho é escolhido pelo F1, e não pelo F2, porque o FL3D tem muitos microssonos e o F2 puxaria o limiar para baixo, o que subestimaria os alarmes numa viagem. \emph{Lição: medir em dois lugares, onde há muito microssono e onde ninguém dorme.}
+
+\paragraph{4. Aprender quando avisar não superou a regra (agente de RL).} Com YOLO e $\lambda = 10$, o agente acha 148,6 de 165 episódios com 13,4 falsos alarmes, contra 149 e 10 da regra com piso. Ele aprendeu sozinho a ignorar o bocejo e a avisar com 0,8 s quando já houve 3 ou mais fechamentos longos no último minuto, mas os vídeos do FL3D têm de 20 s a 2 min por pessoa, pouco para personalizar. Os números do YOLO mudam com a GPU (143 e 15,4 numa RTX 4060), então diferenças de poucos episódios não contam. \emph{Lição: sem dados por pessoa, a regra escrita à mão é difícil de bater, e o agente só reencontrou o que a regra já fazia.}
+
+\paragraph{5. O limiar adaptativo pedido na intermediária não tinha o que corrigir.} Os falsos alarmes do UTA se concentram em quem tem o olho aberto menor na imagem, então um limiar por pessoa parecia a saída. Mas o YOLO dá P(fechado) quase zero com o olho aberto: a linha de base mediana ficou em 0 em todas as bases e o F2 não mudou ($-0{,}007$, \ic{-0{,}019}{+0{,}001}). A fusão já corrige o efeito (de 18,3 para 13,0 alarmes por hora no terço de olho menor). \emph{Lição: testar a hipótese da banca custou pouco e mostrou que o problema já estava resolvido de outro jeito.}
+
+\paragraph{6. Um modelo de decisão aberto (Laya) achou mais, mas avisou demais.} A Laya recebe um resumo em JSON dos últimos 2 s (P(fechado), EAR, boca, pose da cabeça) e decide se avisa. Com fine-tuning, achou 83 dos 152 fechamentos da BINUS (contra 46 da fusão), mas dá 21,6 alarmes por hora no UTA alerta, o triplo da regra. Só uma semente foi treinada, por tempo. \emph{Lição: achar mais só vale se os falsos alarmes não crescem junto; o motorista desliga o sistema.}
+
+\paragraph{7. Redes no tempo não superam o PERCLOS.} Em 1 minuto de sinais, GRU, TCN e Transformer ficam entre 0,729 e 0,754 de AUC, contra 0,774 do PERCLOS (figura~\ref{fig:prog}). Dar cabeça e expressões às redes (14 canais) piorou: elas sobreajustam cedo (melhor época entre 2 e 9, contra 15 na GRU-4). \emph{Lição: mais canais e mais camadas não compensam poucas pessoas (60).}
+
+\begin{figure}[!t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[xbar,bar width=7pt,width=0.84\textwidth,height=6.6cm,xmin=0.70,xmax=0.80,
+  symbolic y coords={Transformer 14 canais,TCN 14 canais,GRU 14 canais,Logistica 16,TCN 4 canais,GRU 4 canais,Logistica 6,PERCLOS},ytick=data,
+  yticklabels={Transformer (14 canais),TCN (14 canais),GRU (14 canais),Logística (16 atributos),TCN (4 canais),GRU (4 canais),Logística (6 atributos),PERCLOS com limiar},
+  xlabel={AUC por minuto, UTA-RLDD (5 dobras por pessoa)},xmajorgrids,grid style={black!12},tick label style={font=\scriptsize},label style={font=\scriptsize},
+  enlarge y limits=0.09,nodes near coords,nodes near coords style={font=\tiny,/pgf/number format/.cd,fixed,precision=3},point meta=x]
+\addplot[fill=black!25,draw=black!60] coordinates {(0.754,Transformer 14 canais)(0.736,TCN 14 canais)(0.729,GRU 14 canais)(0.772,Logistica 16)(0.754,TCN 4 canais)(0.750,GRU 4 canais)(0.746,Logistica 6)};
+\addplot[fill=blue!55!black,draw=blue!40!black] coordinates {(0.774,PERCLOS)};
+\draw[dashed,black!60] (rel axis cs:0.74,0) -- (rel axis cs:0.74,1);
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{Nenhuma rede por minuto supera o PERCLOS no UTA.} AUC por minuto de cada modelo testado nas seções 8.3 a 8.5 do notebook, com 5 sementes nas redes. A linha tracejada marca o PERCLOS com limiar (0,774). A diferença entre a GRU e o PERCLOS é $-0{,}024$ (\ic{-0{,}059}{+0{,}012}), inconclusiva; as redes de 14 canais são piores que a logística com os mesmos canais, de forma conclusiva.}
+\label{fig:prog}
+\end{figure}
+
+\paragraph{8. A normalização pelo 1º minuto ajuda, mas custa o nível de base.} A MIL normalizada superou a logística com os mesmos sinais no UTA (+0,089, \ic{+0{,}007}{+0{,}181}) e no DROZY (+0,133, sem ajuste). Mas o $\Delta$PERCLOS ficou 0,207 abaixo do PERCLOS absoluto, porque a normalização apaga quem já começa o vídeo sonolento. A combinação do PERCLOS com a MIL devolve esse nível, e foi daí que veio o modelo final. A atenção não acrescentou nada à média simples dos minutos (0,737). \emph{Lição: uma ideia que funciona pela metade pode ser consertada por outra que a complementa.}
+
+\paragraph{9. O melhor modelo muda de base para base.} O MIL-Transformer foi o melhor no UTA (0,875) e no DROZY (0,743), mas caiu a 0,484 na SUST-DDD, em direção real. Só o teste fora das bases de desenvolvimento mostrou isso, e é por isso que o critério final olha a média de quatro bases e não a melhor delas. O fine-tuning com a SUST-DDD também não ajudou na UL-DD (GRU $-0{,}064$, combinado $-0{,}040$). \emph{Lição: o ganho de um modelo numa base não é evidência numa câmera nova.}
+
+\paragraph{10. O resultado mais importante foi um limite, não um modelo.} Todas as análises de erro apontam a mesma causa: dentro da mesma pessoa, o PERCLOS separa o sono quase sem erro (11 de 11 pessoas na UL-DD), e entre pessoas cai a 0,763. O que limita a sonolência por câmera é o tamanho do olho na imagem, a câmera e a luz de cada pessoa, e não a falta de arquitetura. No microssono aconteceu o mesmo na BINUS: o FL3D parecia resolvido (90,7\%) até medirmos em outra base (cerca de 30\%).
 
 %------------------------------------------------------------------
 \section{Discussão, limitações e conclusão}
@@ -357,16 +399,38 @@ A figura~\ref{fig:arq} mostra os dois sistemas. Os dois partem do mesmo rastread
 \label{fig:redes}
 \end{figure}
 
+\subsection{Experimentos que não entraram: como foram feitos}
+\label{sec:descartados}
+
+\paragraph{Agente de RL (seção 7).} \emph{Q-learning} com tabela de $72 \times 3$ entradas, $\varepsilon$-guloso. Durante cada fechamento de olho, a cada 0,2 s (de 0,4 a 2,8 s), o agente escolhe entre esperar, dar aviso leve ou aviso forte. O estado combina a duração do fechamento (6 faixas), os fechamentos de 0,8 s ou mais no último minuto (0, 1--2, 3 ou mais), a boca aberta e se houve aviso nos últimos 30 s. A recompensa é $+4$ ou $+5$ por aviso leve ou forte dentro de um microssono de 1 s ou mais, $-2\lambda$ ou $-5\lambda$ por aviso falso, $-0{,}3$ por passo de espera dentro de um microssono e $-10$ por microssono sem aviso. O $\lambda$ é a escolha de quanto o grupo prefere perder um microssono a dar um alarme à toa, e por isso aparece como curva. O piso de 3 s não é decidido pelo agente. Uma tecla simulada de ``foi alarme falso'' pune a tabela na hora. A avaliação usa a linha do tempo completa do FL3D com as piscadas recolocadas, 11 dobras de 4 vídeos e 5 sementes.
+
+\paragraph{Redes no tempo (seções 8.4 e 8.5).} GRU (memória de 32 números, cerca de 3,7 mil parâmetros) e TCN (convoluções causais de tamanho 3, dilatações de 1 a 256, 9 camadas, cerca de 6,6 mil parâmetros) leem o minuto inteiro com 4 canais (P(fechado), EAR, boca e rosto). O Transformer e as variantes de 14 canais acrescentam pose da cabeça e expressões. Todas são treinadas do zero, com 20\% das pessoas do treino como validação, a época de menor perda na validação, uma janela aleatória de 54 s e ruído como aumento, e 5 sementes. Tamanhos, taxa de aprendizado e épocas foram fixados antes de ver os resultados.
+
+\paragraph{Limiar adaptativo (11.2).} A ideia é descontar de cada pessoa o P(fechado) que ela tem com o olho aberto, estimado nos primeiros 30 s, para que quem tem o olho menor na imagem não dispare alarmes. Foi medido como diferença de F2 no FL3D e como alarmes por hora no UTA, com protocolo escrito antes (\texttt{docs/protocolo\_limiar\_adaptativo.md}).
+
+\paragraph{Laya (11.3).} Modelo aberto (Apache 2.0) que não vê imagem: lê um JSON de 12 campos de uma janela de 2 s, deslizando a cada 0,5 s (P(fechado), EAR relativo, boca e bocejo, pose da cabeça, olhar para baixo e fração de quadros com rosto), e responde se há microssono e se deve disparar o alarme. Foi treinado com fine-tuning de 4 épocas, uma só semente, e comparado a uma regressão logística com os mesmos campos e às regras. Rodou fora do notebook, com protocolo escrito antes.
+
+\paragraph{Fora do pipeline.} O YOLO como detector de rosto e o SAM 2 também foram considerados e não entraram. A pergunta sobre eles à organização ainda está em aberto.
+
 \subsection{Protocolo experimental}
 \label{sec:protocolo}
 
 \begin{itemize}
   \item \textbf{Divisão por pessoa} em qualquer treino, e classificadores com média de 5 sementes, porque a mesma semente em outra GPU variou a AUC-PR da MobileNet no vídeo de 0,65 a 0,76.
   \item \textbf{Protocolos fixados antes.} Cada frente tem um documento aprovado antes de rodar (\texttt{docs/protocolo\_*.md}): a entrada rica (seção 8.5 do notebook), a MIL com o DROZY (8.7), as métricas F, o filtro de sorriso, o modelo final de sonolência e as bases novas. Canais, atributos, modelos e hiperparâmetros não mudam olhando as dobras de teste. A análise de erros é exploratória.
-  \item \textbf{Critério do microssono (aprovado em 13/11).} Fica o candidato com maior F2 na validação cruzada do FL3D se (1) a diferença de F2 contra o YOLO com filtro tiver IC de 95\% sem zero e (2) a taxa de alarmes falsos somando as bases de teste (alarmes $\div$ horas) não for maior. O piso de 3 s é segurança por projeto, e o filtro de sorriso tem critério próprio.
+  \item \textbf{Critério do microssono (aprovado em 13/11).} Fica o candidato com maior F2 na validação cruzada do FL3D se (condição 1) a diferença de F2 contra o YOLO com filtro tiver IC de 95\% sem zero e (condição 2) a taxa de alarmes falsos somando as bases de teste (alarmes $\div$ horas) não for maior. O piso de 3 s é segurança por projeto, e o filtro de sorriso tem critério próprio.
   \item \textbf{Critério da sonolência, em dois níveis.} Nível 1 (escolha): maior AUC média nas bases, sem nenhuma base em que o IC contra o PERCLOS absoluto fique todo abaixo de zero. Nível 2 (afirmação): só dizemos que o escolhido supera o PERCLOS se a diferença média nas bases novas (SUST-DDD e UL-DD) tiver IC acima de zero.
   \item \textbf{Troca de critério, declarada.} O critério de sonolência foi trocado em 13/11, depois de ver o UTA e o DROZY e antes de extrair a SUST-DDD. Isso favorece quem já ia bem nessas duas bases. A UL-DD entrou por uma emenda aprovada antes de ver qualquer número dela.
 \end{itemize}
+
+\subsection{Métricas}
+\label{sec:metricas}
+
+\paragraph{Microssono.} Um \emph{episódio} é um trecho com rótulo de microssono de 1 s ou mais (buracos de até 0,5 s se juntam). Um \emph{acerto} é um alarme que cai dentro de um episódio, com tolerância de 0,5 s, e cada episódio conta uma vez. Um \emph{falso alarme} é um alarme fora de qualquer episódio. O \emph{recall} é acertos $\div$ episódios; a \emph{precisão}, acertos $\div$ (acertos + falsos); $F_1$ é a média harmônica dos dois, e $F_2 = 5PR/(4P + R)$ pesa mais o recall, porque perder um microssono custa mais que um alarme a mais. Em pessoas acordadas, não há episódios, e a medida é \emph{alarmes por hora} (falsos $\div$ horas de vídeo). Como o FL3D tem muitos microssonos, a precisão e o $F_1$ comparam sinais e não descrevem uma viagem.
+
+\paragraph{Sonolência.} A medida é a AUC por minuto (1 clipe) ou por vídeo ou sequência (uma pessoa-sessão), conforme a tabela. O \emph{PERCLOS dentro da pessoa} compara, para cada pessoa que tem uma sessão alerta e uma sonolenta, os dois PERCLOS, e a AUC é a fração de pessoas em que a sessão sonolenta tem o maior valor (11 de 11 na UL-DD); \emph{entre pessoas} é a AUC com todas as pessoas juntas. A $\text{Logística-}\Delta16$ é a regressão logística sobre 16 atributos do minuto menos os mesmos atributos do 1º minuto do vídeo.
+
+\paragraph{Incerteza.} Nos números do microssono, o IC de 95\% vem de \emph{bootstrap por vídeo} (2.000 reamostragens para um recall; 5.000 para a diferença entre dois sinais, com os mesmos vídeos sorteados nos dois). Os das AUC seguem o protocolo de cada frente (\texttt{docs/protocolo\_*.md}). Uma diferença só é dita conclusiva quando o IC não passa por zero. O \emph{holdout} são 5 vídeos do FL3D separados desde o começo e vistos nas avaliações anteriores, e por isso são só uma confirmação fraca.
 
 \subsection{Demonstração}
 \label{sec:demo}
@@ -375,8 +439,11 @@ A demo (\texttt{demo/app.py}) lê a webcam do notebook, extrai os sinais com o m
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\textwidth]{figs/painel.png}
-\caption{\textbf{Painel da demo no navegador, no início do uso.} À esquerda, o vídeo espelhado com o tempo de olho fechado; à direita, o estado do sistema (aqui, calibrando o 1º minuto), o sinal de olho fechado com os filtros de bocejo e de sorriso, o PERCLOS do último minuto com o limiar de 2,4\% escolhido no UTA-RLDD, a sonolência do Wakely-MIL e os eventos. Embaixo, as entradas da MIL. Captura sem rosto: nenhum quadro de pessoa é mostrado.}
+\textbf{(a)}\\[2pt]
+\includegraphics[width=\textwidth]{figs/painel_a.jpeg}\\[6pt]
+\textbf{(b)}\\[2pt]
+\includegraphics[width=0.7\textwidth]{figs/painel_b.jpeg}
+\caption{\textbf{Painel da demo no navegador, em uso.} (a) Estado normal (``Tudo certo''): o vídeo espelhado com os olhos em verde (abertos) e a boca em contorno; à direita, o sinal de olho fechado da fusão EAR + YOLO (14,9\%, abaixo do limiar), o estado dos filtros de bocejo e de sorriso, o PERCLOS do último minuto (2,2\%, com o limiar de 2,4\% escolhido no UTA-RLDD) e o cartão do Wakely-MIL, que ainda aguarda 1 minuto de uso. (b) Cartão ``Entradas da MIL'': os quatro sinais por quadro do último minuto (P(fechado) do YOLO, EAR, abertura da boca e rosto visível) e, abaixo, os atributos do 1º minuto e do último minuto com a diferença, que é o que a rede lê. A pessoa na imagem é um integrante do grupo, que autorizou o uso.}
 \label{fig:painel}
 \end{figure}
 
@@ -401,7 +468,7 @@ Em testes, a regra ao vivo dá os mesmos alarmes da fusão offline nos 44 vídeo
 
 \bibitem{euroncap} Euro NCAP. \emph{Assessment Protocol: Safe Driving, Driver Engagement}, v1.2. \url{https://cdn.euroncap.com/cars/assets/Euro_NCAP_Protocol_Safe_Driving_Driver_Engagement_v1_2_ebce03a443.pdf}
 
-\bibitem{skorucak2020} J.~Skorucak et al. Microsleeps detectados automaticamente (critérios BERN) e desempenho em simulador. \emph{Frontiers in Neuroscience}, 14:8, 2020. % TODO: conferir o título original em inglês.
+\bibitem{skorucak2020} J.~Skorucak et al. Automatically detected microsleep episodes in the fitness-to-drive assessment. \emph{Frontiers in Neuroscience}, 14:8, 2020. doi:10.3389/fnins.2020.00008.
 
 \bibitem{boyle2008} L.~N.~Boyle et al. Driver performance in the moments surrounding a microsleep. \emph{Transportation Research Part F}, 2008.
 
@@ -411,21 +478,21 @@ Em testes, a regra ao vivo dá os mesmos alarmes da fusão offline nos 44 vídeo
 
 \bibitem{massoz2018} Q.~Massoz, J.~G.~Verly e M.~Van Droogenbroeck. Multi-timescale drowsiness characterization based on a video of a driver's face. \emph{Sensors}, 18(9), 2018.
 
-\bibitem{revisao126} Revisão de 126 estudos sobre detecção de sonolência: obstáculos para levar a detecção às estradas. arXiv:2109.08355. % TODO: conferir autores e título completos.
+\bibitem{revisao126} E.~Perkins, C.~Sitaula, M.~Burke e F.~Marzbanrad. Challenges of driver drowsiness prediction: the remaining steps to implementation. arXiv:2109.08355, 2021.
 
-\bibitem{anund2013} A.~Anund et al. Estudo de sonolência com observadores no banco de trás em 24 motoristas numa rodovia sueca, 2013. PMC3665781. % TODO: conferir título e periódico.
+\bibitem{anund2013} A.~Anund, C.~Fors, D.~Hallvig, T.~Åkerstedt e G.~Kecklund. Observer rated sleepiness and real road driving: an explorative study. \emph{PLoS ONE}, 8(5):e64782, 2013. doi:10.1371/journal.pone.0064782.
 
 \bibitem{ilse2018} M.~Ilse, J.~M.~Tomczak e M.~Welling. Attention-based deep multiple instance learning. \emph{ICML}, 2018.
 
-\bibitem{fl3d} FL3D: frame-level driver drowsiness detection. Conjunto de dados no Kaggle. \url{https://www.kaggle.com/datasets/matjazmuc/frame-level-driver-drowsiness-detection-fl3d} % TODO: conferir autores e artigo original.
+\bibitem{fl3d} Frame Level Driver Drowsiness Detection (FL3D). Conjunto de dados no Kaggle, derivado do NITYMED (autoria não informada na página). \url{https://www.kaggle.com/datasets/matjazmuc/frame-level-driver-drowsiness-detection-fl3d}
 
-\bibitem{nitymed} N.~Petrellis et al. NITYMED: night-time yawning-microsleep-eyeblink-driver distraction dataset. IEEE DataPort. \url{https://ieee-dataport.org/documents/nitymed} % TODO: conferir autores e título.
+\bibitem{nitymed} N.~Petrellis et al. NITYMED: night-time yawning-microsleep-eyeblink-driver distraction dataset. IEEE DataPort. doi:10.21227/85xe-3f88.
 
-\bibitem{eyeblink8} Eyeblink8: conjunto de dados de piscadas, 2014. % TODO: conferir autores (Drutarovsky e Fogelton) e título.
+\bibitem{eyeblink8} T.~Drutarovský e A.~Fogelton. Eye blink detection using variance of motion vectors. \emph{ECCV Workshops}, pp.~436--448, 2014. (Introduz o Eyeblink8.)
 
-\bibitem{sustddd} SUST-DDD: SUST driver drowsiness dataset. Zenodo. \url{https://zenodo.org/records/6519933} % TODO: conferir autores e artigo.
+\bibitem{sustddd} E.~Kavalci Yilmaz e M.~A.~Akcayol. SUST-DDD: a real-drive dataset for driver drowsiness detection. \emph{31st Conference of Open Innovations Association (FRUCT)}, pp.~416--421, 2022. doi:10.5281/zenodo.6519933.
 
-\bibitem{uldd} UL-DD: a multimodal drowsiness dataset using video, biometric, and behavioral data. 2025. % TODO: conferir autores e fonte (Zenodo).
+\bibitem{uldd} M.~Bodaghi, M.~Hosseini, R.~Gottumukkala, R.~T.~Bhupatiraju, I.~Ahmad e M.~Gabbouj. UL-DD: a multimodal drowsiness dataset using video, biometric signals, and behavioral data. arXiv:2507.13403, 2025.
 
 \bibitem{mediapipe} C.~Lugaresi et al. MediaPipe: a framework for building perception pipelines. arXiv:1906.08172, 2019.
 
